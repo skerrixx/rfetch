@@ -133,10 +133,15 @@ fn format_package_string(cache: &PackageCache) -> String {
     }
 
     if parts.is_empty() {
-        "|   packages: none found (are you on Windows?)".to_string()
+        "|   packages: none found".to_string()
     } else {
         format!("  packages: {}", parts.join(", "))
     }
+}
+
+pub fn clear_cache() {
+    let cache_path = "/tmp/rfetch_packages.json";
+    let _ = std::fs::remove_file(cache_path);
 }
 
 pub fn getform() -> String {
