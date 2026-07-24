@@ -1,0 +1,14 @@
+[package]
+name = "rfetch"
+version = "0.3.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+sysinfo = "0.33"
+gfxinfo = "0.1"
+whoami = "1.5"
+starship-battery = "0.11"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+colored = "3.1.1"
