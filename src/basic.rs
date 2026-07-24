@@ -64,34 +64,35 @@ fn format(os: &str) -> &'static str {
         "arch" => "󰣇 arch",
 
 
-        "debian" => " debian",
-        "ubuntu" => "󰕈 ubuntu",
-        "mint" => "󰣭 mint",
-        "kali" => "  kali (larp final boss)",
-        "raspbian" => " raspbian",
+        "debian" => " debian", // yes
+        "ubuntu" => "󰕈 ubuntu", // yes
+        "mint" => "󰣭 mint", // yes
+        "kali" => "  kali (larp final boss)", // yes
+        "raspbian" => " raspbian", // yes
 
-        "fedora" => " fedora",
-        "rhel" | "redhat" | "red hat enterprise linux" => "  rhel",
-        "centos" => " centos",
+        "fedora" => " fedora", // yes
+        "rhel" | "redhat" | "red hat enterprise linux" => "  rhel", //yes
+        "centos" => " centos", // yes
         "rocky" | "rocky linux" => "  rocky",
-        "almalinux" | "alma linux" => "  alma",
+        "almalinux" | "alma linux" | "alma" => "  alma", // yes
 
-        "opensuse-tumbleweed" | "opensuse tumbleweed" => " tumbleweed",
-        "opensuse-leap" | "opensuse leap" => " leap",
-        "sles" => " sles",
-        "cachyos" => " cachy",
+        "opensuse-tumbleweed" | "opensuse tumbleweed" => " tumbleweed", // yes
+        "opensuse-leap" | "opensuse leap" => " leap", // yes
+        "sles" => " sles", // yes
+        "cachyos" => " cachy", // yes
 
-        "gentoo" => " gentoo",
-        "void" | "voidlinux" => " void",
-        "nixos" => " nix",
-        "pop" | "popos" | "pop_os" | "pop os" => "  pop",
-        "elementary" | "elementary os" => " elementary",
-        "mageia" => " mageia",
-        "openmandriva" => " openmandriva",
-        "lfs" => "󰐱  linux from scratch",
-        "bedrock" => "󰆦  bedrock",
-        "rfetch" => "  rfetch",
-        _ => "  linux (unknown)",
+        "gentoo" => " gentoo", // yes
+        "void" | "voidlinux" => " void", // yes
+        "nixos" => " nix", // yes
+        "pop" | "popos" | "pop_os" | "pop os" => "  pop", // yes
+        "elementary" | "elementary os" => " elementary", // yes
+        "mageia" => " mageia", // yes
+        "openmandriva" => " openmandriva", // yes
+        "lfs" => "󰐱  linux from scratch", // yes
+        "bedrock" => "󰆦  bedrock", // yes
+        "rfetch" => "  rfetch", // yes
+        "mist" => "  mist", // yes
+        _ => "  linux (unknown)", // yes
     }
 }
 
@@ -149,21 +150,21 @@ pub fn get_ascii_art(name: &str) -> &'static str {
         "debian" => r#"
         _,met$$$$$gg.
      ,g$$$$$$$$$$$$$$$P.
-   ,g$$P``       ``'Y$$.
+   ,g$$P""       """Y$$.".
   ,$$P'              `$$$.
 ',$$P       ,ggs.     `$$b:
-`d$$'     ,`'   .    $$$
- $$P      d     ,    $$P
- $$:      $   -    ,d$$'
- $$;      Y._   _,d'
- Y$$.    `.``Y$$$$P`'
+`d$$'     ,"'   .      $$$
+ $$P      d     ,     $$P
+ $$:      $   -     ,d$$'
+ $$;      Y._     _,d'
+ Y$$.    `.`"Y$$$$P"'
  `$$b      "-.__
   `Y$$b
    `Y$$.
      `$$b.
        `Y$$b.
          `"Y$b._
-             ``''-
+             `""''
 "#,
         "fedora" => r#"
              .',-------'.
@@ -225,18 +226,18 @@ MMMMMMMMMMM.                     MMMM
    -yNMMMMMMMMMMMNNNmmdhy+-
  `omMMMMMMMMMMMMNmdmmmmddhhy/`
  omMMMMMMMMMMMN-'''yyohmdddhhhdo`
-.ydMMMMMMMMMMd..  ../smdddhhhhdm+`
- oyhdmNMMMMMMMNb-.-ddmddddhhhhyhNd.
-  :oyhhdNNMMMMMMMNNNmmdddhhhhhyymMh
-    .:+sydNMMMMMNNNmmmdddhhhhhhmMmy
-       /mMMMMMMNNNmmmdddhhhhhmMNhs:
-    `oNMMMMMMMNNNmmmddddhhdmMNhs+`
-  `sNMMMMMMMMNNNmmmdddddmNMmhs/.
- /NMMMMMMMMNNNNmmmdddmNMNdso:`
-+MMMMMMMNNNNNmmmmdmNMNdso/-
-yMMNNNNNNNmmmmmNNMmhs+/-`
-/hMMNNNNNNNNMNdhs++/-`
-`/ohdmmddhys+++/:.`
+.ydMMMMMMMMMMd..  ../smdddhhhhiii`
+ oyhdmNMMMMMMMNb-.-ddmddddhhhiiii;.
+  :oyhhdNNMMMMMMMNNNmmdddhhhhiii;/;
+    .:+sydNMMMMMNNNmmmdddhhiii;;;,,
+       /mMMMMMMNNNmmmdddhiii;;;;;,,
+    `oNMMMMMMMNNNmmmdddiii;;;;;,,`
+  `sNMMMMMMMMNNNmmmdidiii;;;;;,.
+ /NMMMMMMMMNNNNmmmddii;;;;;,,`
++MMMMMMMNNNNNmmmmiii;;;;;,,
+yMMNNNNNNNmmmmmNiii;;;,,
+/hMMNNNNNNNNMN;ii;,,,`
+`/ohdmmddhys+ii;;.,
   `-//////:--.  
 "#,
 	"mint" => r#"
@@ -316,6 +317,26 @@ yMMNNNNNNNmmmmmNNMmhs+/-`
    \+=============/
     \+++=========/
 "#,
+	"void" => r#"
+            ⣀⣀⣠⣤⣴⣶⣿⣿⣿⣶⣶⣦⣤⣄⡀          
+         ⢤⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿;.        
+          ⠻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣄      
+     .     ⠹⣿⡿⠋⠉     ⠉⠙⠛⠿⣿⣿⣿⣿⣿⣿⣿⣆    
+    :::,    ⠁            ⠈⠛⠿⣿⣿⣿⣿⣿⣧   
+   ::::::.       _._        ⣿⣿⣿⣿⣿⣿⣧  
+  .::::::`    +=======+     ⠸⣿⣿⣿⣿⣿⣿⣧ 
+  ::::::;    ==========+     ⠘⣿⣿⣿⣿⣿⣿  
+ :::::::    ============      ⣿⣿⣿⣿⣿⣿⡇
+ :::::::    ============      ⣿⣿⣿⣿⣿⣿ 
+  ::::::     ==========      ⣰⣿⣿⣿⣿⣿⣿ 
+  -::::::      +====+       ⣰⣿⣿⣿⣿⣿⣿⠇ 
+   +::::::,                 ⢻⣿⣿⣿⣿⣿⣿  
+    +:::::::.           .    ⠙⢿⣿⣿⡟   
+     -:::::::::..___..-::-.    ⠙⠋    
+       +:::::::::::::::::::;.        
+         ~:::::::::::::::::-`        
+            -::::::::~               
+	"#,
 	"rfetch" => r#"
      ....
  .-oOXNNX0d,.
@@ -330,6 +351,223 @@ dMMM,  kMMMk   KMMM`
 oMMM'   :WMMb  dMMM,
 `TMP'   `TMP'  `TMT'
 	"#,
+	"centos" => r#"
+                 ..
+               .PLTJ.
+              <><><><>
+     KKSSV' 4KKK LJ KKKL.'VSSKK
+     KKV' 4KKKKK LJ KKKKAL 'VKK
+     V'   'VKKKK LJ KKKKV' ' 'V
+     .4MA.  'VKK LJ KKV' '.4Mb.
+   . KKKKKA.  'V LJ V' '.4KKKKK .
+ .4D KKKKKKKA. ' LJ ''.4KKKKKKK FA.
+<QDD ++++++++++++  ++++++++++++ GFD>
+ 'VD KKKKKKKK'   LJ ..'KKKKKKKK FV
+   ' VKKKKK'  .4 LJ K. .'KKKKKV '
+      'VK'  .4KK LJ KKA. .'KV'
+     A.   .4KKKK LJ KKKKA. . .4
+     KKA. 'KKKKK LJ KKKKK' .4KK
+     KKSSA. VKKK LJ KKKV .4SSKK
+              <><><><>
+               'MKKM'
+                 ''
+"#,
+	"pop" | "popos" => r#"             *CCC                
+          CCCCCCCCCC*              
+        CCCCC`'CCCCCCC              
+       CCCCCC  `:CCCCC      _     
+        CCCCCC   CCCCC.  ,dCCC*       
+         CCCCCCb,CCCCC   CCCCCC        
+          CCCCCCCCCCC    CCCCC'        
+           CCCCCCCC      CCCC'        
+            ,CCCC,       CCC'         
+             *CCCC       P`            
+               CCCC                    
+                CCCC   767            
+                                     
+         .-ccccccccccccccccc-,      
+         \CCCCCCCCCCCCCCCCCCC/
+"#,
+	"nix" | "nixos" => r#"
+        __    ____    __
+       /  \   \;;;\  /;;\
+       \   \   \;;;\/;;;/
+     ___\   \___\;;;;;;/
+    /            \;;;;/   /\
+   /______________\;;;\  /  \
+        /;;;/      \;;;\/   /
+ ______/;;;/        \;;/   /___
+/;;;;;;;;;/          \/        \
+\;;;;;;;;/\          /   ______/
+    /;;;/  \        /   /
+   /;;;/\   \______/___/_____
+   \;;/  \   \;;;;;;;;;;;;;;/
+    \/   /    \;;;;;;;;;;;;/
+        /      \   \;;;\
+       /   /\   \   \;;;\
+       \__/  \___\   \;;/
+"#,
+	"opensuse-tumbleweed" | "opensuse-leap" | "sles" => r#"
+           .;ldkO0000Okdl;.
+       .;d00xl:^''''''^:ok00d;.
+     .d00l'                'o00d.
+   .d0Kd'  Okxol:;,.          
+  .OKKKK0kOKKKKKKKKKKOxo:,      
+ ,0KKKKKKKKKKKKKKKK0P^,,,^dx:   
+.OKKKKKKKKKKKKKKKKk'.oOPPb.'0k. 
+:KKKKKKKKKKKKKKKKK: kKx..dd lKd  
+dKKKKKKKKKKKOx0KKKd ^0KKKO' kKKc 
+dKKKKKKKKKKKK;.;oOKx,..^..;kKKK0.
+:KKKKKKKKKKKK0o;...^cdxxOK0O/^^'  .0K:
+ kKKKKKKKKKKKKKKK0x;,,......,;od  lKk
+ '0KKKKKKKKKKKKKKKKKKKKK00KKOo^  c00'
+  'kKKKOxddxkOO00000Okxoc;''   .dKk'
+    l0Ko.                    .c00l'
+     'l0Kk:.              .;xK0l'
+        'lkK0xl:;,,,,;:ldO0kl'
+            '^:ldxkkkkxdl:^'
+"#,
+	"mist" | "mistlinux" => r#"
+               XMMMMMMc
+            lMMMMMMMMMMMc
+           ;MMMMd    MMMMo  ,-,
+            WMMM:     MMW0dc:::::.
+              XMMMW   KKc::.  .:::,
+                      Mk:::.   .:::
+                     MMMO  ..  .:::
+                   MMMMd       :::.
+ oMc           XMMMMM        .:::.
+      WMMMMMMMMN           ,-::.
+                   ,-:::::::''
+              .,-::;,
+"#,
+	"openmandriva" => r#"
+                 ``````
+            `-:/+++++++//:-.`
+         .:+++oooo+/:.``   ``
+      `:+ooooooo+:.  `-:/++++++/:.`
+     -+oooooooo:` `-++o+/::::://+o+/-
+   `/ooooooooo-  -+oo/.`        `-/oo+.
+  `+ooooooooo.  :os/`              .+so:
+  +sssssssss/  :ss/                 `+ss-
+ :ssssssssss`  sss`                  .sso
+ ossssssssss  `yyo                    sys
+`sssssssssss` `yys                   `yys
+`sssssssssss:  +yy/                  +yy:
+ oyyyyyyyyyys. `oyy/`              `+yy+
+ :yyyyyyyyyyyo. `+yhs:.         `./shy/
+  oyyyyyyyyyyys:` .oyhys+:----/+syhy+. `
+  `syyyyyyyyyyyyo-` .:osyhhhhhyys+:``.:`
+   `oyyyyyyyyyyyyys+-`` `.----.```./oo.
+     /yhhhhhhhhhhhhhhyso+//://+osyhy/`
+      `/yhhhhhhhhhhhhhhhhhhhhhhhhy/`
+        `:oyhhhhhhhhhhhhhhhhhhyo:`
+            .:+syhhhhhhhhys+:-`
+                ``....``
+"#,
+	"mageia" => r#"        .°°.
+         °°   .°°.
+         .°°°. °°
+         .   .
+          °°° .°°°.
+      .°°°.   '___'
+     .'___'        .
+   :dkxc;'.  ..,cxkd;
+ .dkk. kkkkkkkkkk .kkd.
+.dkk.  ';cloolc;.  .kkd
+ckk.                .kk;
+xO:                  cOd
+xO:                  lOd
+lOO.                .OO:
+.k00.              .00x
+ .k00;            ;00O.
+  .lO0Kc;,,,,,,;c0KOc.
+     ;d00KKKKKK00d;
+        .,KKKK,.
+"#,
+	"alma" | "almalinux" => r#"         'c:.
+        lkkkx, ..       ..   ,cc,
+        okkkk:ckkx'  .lxkkx.okkkkd
+        .:llcokkx'  :kkkxkko:xkkd,
+      .xkkkkdood:  ;kx,  .lkxlll;
+       xkkx.       xk'     xkkkkk:
+       'xkx.       xd      .....,.
+      .. :xkl'     :c      ..''..
+    .dkx'  .:ldl:'. '  ':lollldkkxo;
+  .''lkkko'                     ckkkx.
+'xkkkd:kkd.       ..  ;'        :kkxo.
+,xkkkd;kk'      ,d;    ld.   ':dkd::cc,
+ .,,.;xkko'.';lxo.      dx,  :kkk'xkkkkc
+     'dkkkkkxo:.        ;kx  .kkk:;xkkd.
+       .....   .;dk:.   lkk.  :;,
+             :kkkkkkkdoxkkx
+              ,c,,;;;:xkkd.
+                ;kkkkl...
+                ;kkkkl
+                 ,od;
+"#,
+	"rocky" => r#"      __wgliliiligw_,
+       _williiiiiiliilililw,
+     _%iiiiiilililiiiiiiiiiii_
+   .Qliiiililiiiiiiililililiilm.
+  _iiiiiliiiiiililiiiiiiiiiiliil,
+ .lililiiilililiiiilililililiiiii,
+_liiiiiiliiiiiiiliiiiiF{iiiiiilili,
+jliililiiilililiiili@`  ~ililiiiiiL
+iiiliiiiliiiiiiili>`      ~liililii
+liliiiliiilililii`         -9liiiil
+iiiiiliiliiiiii~             "4lili
+4ililiiiiilil~|      -w,       )4lf
+-liiiiililiF'       _liig,       )'
+ )iiiliii@`       _QIililig,
+  )iiii>`       .Qliliiiililw
+   )<>~       .mliiiiiliiiiiil,
+	  _gllilililiililii~
+	 giliiiiiiiiiiiiT`
+	-^~lilili@~~'
+"#,
+	"raspbian" => r#"`.::///+:/-.        --///+//-:`
+ `+oooooooooooo:   `+oooooooooooo:
+  /oooo++//ooooo:  ooooo+//+ooooo.
+  `+ooooooo:-:oo-  +o+::/ooooooo:
+    `:oooooooo+``    `.oooooooo+-
+      `:++ooo/.        :+ooo+/.`
+         ...`  `.----.`  ``..
+      .::::-``:::::::::.`-:::-`
+     -:::-`   .:::::::-`  `-:::-
+    `::.  `.--.`  `` `.---.``.::`
+        .::::::::`  -::::::::` `
+  .::` .:::::::::- `::::::::::``::.
+ -:::` ::::::::::.  ::::::::::.`:::-
+ ::::  -::::::::.   `-::::::::  ::::
+ -::-   .-:::-.``....``.-::-.   -::-
+  .. ``       .::::::::.     `..`..
+    -:::-`   -::::::::::`  .:::::`
+    :::::::` -::::::::::` :::::::.
+    .:::::::  -::::::::. ::::::::
+     `-:::::`   ..--.`   ::::::.
+       `...`  `...--..`  `...`
+             .::::::::::
+              `.-::::-`
+    "#,
+	"elementary" | "elementary os" | "testestest" => r#"         eeeeeeeeeeeeeeeee
+      eeeeeeeeeeeeeeeeeeeeeee
+    eeeee  eeeeeeeeeeee   eeeee
+  eeee   eeeee       eee     eeee
+ eeee   eeee          eee     eeee
+eee    eee            eee       eee
+eee   eee            eee        eee
+ee    eee           eeee       eeee
+ee    eee         eeeee      eeeeee
+ee    eee       eeeee      eeeee ee
+eee   eeee   eeeeee      eeeee  eee
+eee    eeeeeeeeee     eeeeee    eee
+ eeeeeeeeeeeeeeeeeeeeeeee    eeeee
+  eeeeeeee eeeeeeeeeeee      eeee
+    eeeee                 eeeee
+      eeeeeee         eeeeeee
+         eeeeeeeeeeeeeeeee
+"#,
         _ => r#"  ___
          _nnnn_        
         dGGGGMMb       
@@ -347,14 +585,14 @@ oMMM'   :WMMb  dMMM,
 _)      \.___.,|     .'
 \____   )MMMMMP|   .'  
      `-'       `--' 
-"#,
+"#
     }
 }
 
 pub fn get_logo_color(name: &str) -> (u8, u8, u8) {
     let v = normalize(name);
     match v.as_str() {
-        "arch" | "archlinux" => (96, 197, 255),
+        "arch" | "archlinux" => (106, 230, 255),
         "ubuntu" => (233, 84, 32),  
         "debian" => (215, 10, 83),  
         "fedora" => (60, 150, 230),  
@@ -368,17 +606,18 @@ pub fn get_logo_color(name: &str) -> (u8, u8, u8) {
         "opensuse-tumbleweed" | "opensuse tumbleweed" => (115, 186, 37),
         "opensuse-leap" | "opensuse leap" => (115, 186, 37),
         "sles" => (0, 153, 204),
-        "pop" | "popos" | "pop_os" | "pop os" => (72, 169, 197),
+        "pop" | "popos" | "pop_os" | "pop os" => (122, 225, 245),
         "elementary" | "elementary os" => (100, 186, 171),
         "void" | "voidlinux" => (71, 128, 97),
-        "nixos" => (82, 119, 195),
+        "nixos" => (119, 179, 220),
         "mageia" => (47, 95, 143),
-        "openmandriva" => (0, 153, 204),
+        "openmandriva" => (34, 129, 188),
         "gentoo" => (217, 200, 255),
         "lfs" => (255, 234, 174), 
         "bedrock" => (160, 160, 160), 
         "cachyos" => (3, 219, 209),
         "rfetch" => (100, 230, 255), 
+        "mist" => (180, 218, 215), 
         _ => (255, 255, 255), 
     }
 }
@@ -389,7 +628,7 @@ pub fn known_distros() -> Vec<&'static str> {
         "fedora", "rhel", "centos", "rocky", "almalinux",
         "opensuse-tumbleweed", "opensuse-leap", "sles",
         "gentoo", "void", "nixos", "pop", "elementary", "mageia",
-        "openmandriva", "lfs", "bedrock", "rfetch", "cachyos"
+        "openmandriva", "lfs", "bedrock", "rfetch", "cachyos", "mist"
     ]
 }
 
@@ -437,6 +676,143 @@ pub fn rampercent() -> String {
     }
 
     ((used_gb / total_gb) * 100.0).round().to_string()
+}
+
+pub struct DiskInfo {
+    pub name: String,
+    pub filesystem: String,
+    pub mount_point: String,
+    pub used_gb: f64,
+    pub total_gb: f64,
+    pub usage_pct: f64,
+}
+
+pub fn disks_info() -> Vec<DiskInfo> {
+    let gb = 1024.0 * 1024.0 * 1024.0;
+    let mut result = Vec::new();
+
+    let df_output = Command::new("df")
+        .arg("-B1")
+        .arg("--exclude-type=tmpfs")
+        .arg("--exclude-type=devtmpfs")
+        .arg("--exclude-type=squashfs")
+        .arg("--exclude-type=overlay")
+        .arg("--exclude-type=proc")
+        .arg("--exclude-type=sysfs")
+        .arg("--exclude-type=cgroup")
+        .arg("--exclude-type=devpts")
+        .arg("--exclude-type=hugetlbfs")
+        .arg("--exclude-type=mqueue")
+        .arg("--exclude-type=pstore")
+        .arg("--exclude-type=securityfs")
+        .arg("--exclude-type=efivarfs")
+        .arg("--exclude-type=bpf")
+        .arg("--exclude-type=tracefs")
+        .arg("--exclude-type=debugfs")
+        .arg("--exclude-type=configfs")
+        .arg("--exclude-type=fusectl")
+        .arg("--exclude-type=autofs")
+        .arg("--output=source,fstype,target,size,used,avail")
+        .output()
+        .ok();
+
+    if let Some(output) = df_output {
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let mut lines = stdout.lines();
+            lines.next(); // skip header
+            for line in lines {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() < 6 {
+                    continue;
+                }
+
+                let source = parts[0];
+                let fstype = parts[1];
+                let target = parts[2];
+
+                // Skip pseudo-filesystems and /boot
+                if target.starts_with("/boot") {
+                    continue;
+                }
+                // Skip if source doesn't look like a real device (/dev/...)
+                if !source.starts_with("/dev/") {
+                    continue;
+                }
+
+                let total_bytes: f64 = match parts[3].parse() { Ok(v) => v, Err(_) => continue };
+                let used_bytes: f64 = match parts[4].parse() { Ok(v) => v, Err(_) => continue };
+
+                if total_bytes <= 0.0 {
+                    continue;
+                }
+
+                let total_gb = total_bytes / gb;
+                let used_gb = used_bytes / gb;
+                let pct = (used_bytes / total_bytes) * 100.0;
+
+
+                let name = source.strip_prefix("/dev/").unwrap_or(source).to_string();
+
+                result.push(DiskInfo {
+                    name,
+                    filesystem: fstype.to_string(),
+                    mount_point: target.to_string(),
+                    used_gb: (used_gb * 10.0).round() / 10.0,
+                    total_gb: (total_gb * 10.0).round() / 10.0,
+                    usage_pct: (pct * 10.0).round() / 10.0,
+                });
+            }
+
+            if !result.is_empty() {
+                return result;
+            }
+        }
+    }
+
+    let disks = sysinfo::Disks::new_with_refreshed_list();
+    for disk in disks.list() {
+        let fs_name = disk.file_system().to_string_lossy();
+        let skip_fs: &[&str] = &[
+            "tmpfs", "devtmpfs", "squashfs", "overlay", "proc", "sysfs",
+            "cgroup", "devpts", "hugetlbfs", "mqueue", "pstore",
+            "securityfs", "efivarfs", "bpf", "tracefs", "debugfs",
+            "configfs", "fuse", "fusectl", "autofs", "efiivarfs",
+        ];
+        if skip_fs.contains(&fs_name.as_ref()) {
+            continue;
+        }
+
+        let mount_point = disk.mount_point().to_string_lossy().to_string();
+        if mount_point.starts_with("/boot") {
+            continue;
+        }
+
+        let total = disk.total_space() as f64 / gb;
+        let avail = disk.available_space() as f64 / gb;
+        let used = total - avail;
+        let pct = if total > 0.0 { (used / total) * 100.0 } else { 0.0 };
+
+        let dev_name = disk.name().to_string_lossy().to_string();
+        let name = if dev_name.starts_with('/') {
+            dev_name.strip_prefix("/dev/").unwrap_or(&dev_name)
+        } else {
+            &dev_name
+        };
+
+        let fstype = disk.file_system().to_string_lossy().to_string();
+
+        result.push(DiskInfo {
+            name: name.to_string(),
+            filesystem: fstype,
+            mount_point: mount_point.clone(),
+            used_gb: (used * 10.0).round() / 10.0,
+            total_gb: (total * 10.0).round() / 10.0,
+            usage_pct: (pct * 10.0).round() / 10.0,
+        });
+    }
+
+    result
 }
 
 pub fn disktot() -> u64 {
