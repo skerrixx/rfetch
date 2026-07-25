@@ -62,7 +62,7 @@ fn normalize(name: &str) -> String {
 fn format(os: &str) -> &'static str {
     match os {
         "arch" => "󰣇 arch",
-
+		"artix" => "󰣇 artix",
 
         "debian" => " debian", // yes
         "ubuntu" => "󰕈 ubuntu", // yes
@@ -125,6 +125,21 @@ pub fn get_ascii_art(name: &str) -> &'static str {
   `+sso+:-`                 `.-/+oso:
  `++:.                           `-/+/
  .`                                 `
+"#,
+	"artix" | "artixlinux" => r#"
+            '
+           'A'
+          'ooo'
+         'ookxo'
+         `ookxxo'
+       '.   `ooko'
+      'ooo`.   `oo'
+     'ooxxxoo`.   `'
+    'ookxxxkooo.`   .
+   'ookxxkoo'`   .'oo'
+  'ooxoo'`     .:ooxxo'
+ 'io'`             `'oo'
+'`                     `'
 "#,
         "ubuntu" => r#"
                              ....
@@ -609,7 +624,7 @@ _)      \.___.,|     .'
 pub fn get_logo_color(name: &str) -> (u8, u8, u8) {
     let v = normalize(name);
     match v.as_str() {
-        "arch" | "archlinux" => (106, 230, 255),
+        "arch" | "archlinux" | "artix" | "artixlinux "=> (106, 230, 255),
         "ubuntu" => (233, 84, 32),  
         "debian" => (215, 10, 83),  
         "fedora" => (60, 150, 230),  
