@@ -61,9 +61,14 @@ fn normalize(name: &str) -> String {
 
 fn format(os: &str) -> &'static str {
     match os {
-        "arch" => "󰣇 arch",
-		"artix" => "󰣇 artix",
-
+        "arch" => "󰣇  arch",
+		"artix" => "  artix",
+		"omarchy" => " omarchy",
+		"manjaro" => "  manjaro",
+		"endeavour" | "endeavouros" => "  endeavour",
+		"archlabs" => "  archlabs",
+		"archcraft" => "  archcraft",
+		"garuda" => "  garuda",
         "debian" => " debian", // yes
         "ubuntu" => "󰕈 ubuntu", // yes
         "mint" => "󰣭 mint", // yes
@@ -140,6 +145,111 @@ pub fn get_ascii_art(name: &str) -> &'static str {
   'ooxoo'`     .:ooxxo'
  'io'`             `'oo'
 '`                     `'
+"#,
+	"manjaro" => r#"██████████████████  ████████
+██████████████████  ████████
+██████████████████  ████████
+██████████████████  ████████
+████████            ████████
+████████  ████████  ████████
+████████  ████████  ████████
+████████  ████████  ████████
+████████  ████████  ████████
+████████  ████████  ████████
+████████  ████████  ████████
+████████  ████████  ████████
+████████  ████████  ████████
+████████  ████████  ████████
+"#,
+	"omarchy" => r#"
+████████████████████████████
+██          ██            ██
+██  ██████████      ████  ██
+██  ██                ██  ██
+██  ██                ██  ██
+██  ██                ██  ██
+██  ██                ██  ██
+██████                ██  ██
+██  ██                ██  ██
+██  ██                ██  ██
+██  ██                ██  ██
+██  ████████████████████  ██
+██           ██           ██
+███████████████  ███████████
+"#,
+	"endeavouros" | "endeavour" => r#"                     ./o.
+                   ./sssso-
+                 `:osssssss+-
+               `:+sssssssssso/.
+             `-/ossssssssssssso/.
+           `-/+sssssssssssssssso+:`
+         `-:/+sssssssssssssssssso+/.
+       `.://osssssssssssssssssssso++-
+      .://+ssssssssssssssssssssssso++:
+    .:///ossssssssssssssssssssssssso++:
+  `:////ssssssssssssssssssssssssssso+++.
+`-////+ssssssssssssssssssssssssssso++++-
+ `..-+oosssssssssssssssssssssssso+++++/`
+   ./++++++++++++++++++++++++++++++/:.
+  `:::::::::::::::::::::::::------``
+"#,
+	"archlabs" => r#"                     'c'
+                    'kKk,
+                   .dKKKx.
+                  .oKXKXKd.
+                 .l0XXXXKKo.
+                 c0KXXXXKX0l.
+                :0XKKOxxOKX0l.
+               :OXKOc. .c0XX0l.
+              :OK0o. ...'dKKX0l.
+             :OX0c  ;xOx''dKXX0l.
+            :0KKo..o0XXKd'.lKXX0l.
+           c0XKd..oKXXXXKd..oKKX0l.
+         .c0XKk;.l0K0OO0XKd..oKXXKo.
+        .l0XXXk:,dKx,.'l0XKo..kXXXKo.
+       .o0XXXX0d,:x;   .oKKx'.dXKXXKd.
+      .oKXXXXKK0c.;.    :00c'cOXXXXXKd.
+     .dKXXXXXXXXk,.     cKx''xKXXXXXXKx'
+    'xKXXXXK0kdl:.     .ok; .cdk0KKXXXKx'
+   'xKK0koc,..         'c,     ..,cok0KKk,
+  ,xko:'.             ..            .':okx;
+ .,'.                                   .',.
+"#,
+	"archcraft" => r#"
+                   ⢰⡆                     
+                  ⢠⣿⣿⡄                  
+                 ⢀⣾⣿⣿⣿⡀                 
+                 ⣼⣿⣿⣿⣿⣷⡀                
+                ⣼⣿⣿⣿⣿⣿⣿⣷                
+               ⢼⣿⣿⣿⣿⣿⣿⣿⣿⣧               
+              ⣰⣤⣈⠻⢿⣿⣿⣿⣿⣿⣿⣧              
+             ⣰⣿⣿⣿⣿⣮⣿⣿⣿⣿⣿⣿⣿⣧             
+            ⣰⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧            
+           ⣰⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧           
+          ⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧          
+         ⣼⣿⣿⣿⣿⣿⡿⣿⣿⡟  ⠸⣿⣿⡿⣿⣿⣿⣿⣿⣷⡀        
+        ⣼⣿⣿⣿⣿⣿⡏          ⠈⣿⣿⣿⣿⣿⣷⡀        
+      ⢀⣼⣿⣿⣿⣿⣿⣿⡗   ⢀⣠⣤⣀   ⠸⣿⣿⣿⣿⣿⣿⣷⡀      
+     ⢀⣾⣿⣿⣿⣿⣿⡏⠁   ⢠⣿⣿⣿⣿⡇    ⢙⣿⣿⣻⠿⣿⣷⡀     
+    ⢀⣾⣿⣿⣿⣿⣿⣿⣷⣤⡀   ⠻⣿⣿⡿⠃   ⢀⣼⣿⣿⣿⣿⣦⣌⠙     
+   ⢠⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⠏           ⢿⣿⣿⣿⣿⣿⣿⣿⣿⣦⡀   
+  ⢠⣿⣿⣿⣿⣿⣿⣿⡿⠟⠋⠁             ⠙⠻⣿⣿⣿⣿⣿⣿⣿⣿⡄  
+ ⣠⣿⣿⣿⣿⠿⠛⠋⠁                    ⠉⠙⠻⢿⣿⣿⣿⣿⣆ 
+⡰⠟⠛⠉⠁                              ⠉⠙⠛⠿⢆
+"#,
+	"garuda" => r#"
+             .:loooodddddd:.
+           .:l:.         .cd:.
+         .:l;.             .co:.
+       .:l;.       ,o.       .:o:.
+     .:l;.       'oddl::::::::;lll.
+   .cc;.         ``````````````;ol.
+ .:c,.                          :`
+ .:l:.     ,,,,,,,,,,,,,,,,,.
+   .clc. .::::cc::::::::clll;.
+     .coc.             ,ll,.
+       .cdl.        .,ll,
+         .coooooollllc'
 "#,
         "ubuntu" => r#"
                              ....
@@ -624,7 +734,10 @@ _)      \.___.,|     .'
 pub fn get_logo_color(name: &str) -> (u8, u8, u8) {
     let v = normalize(name);
     match v.as_str() {
-        "arch" | "archlinux" | "artix" | "artixlinux "=> (106, 230, 255),
+        "arch" | "archlinux" | "artix" | "artixlinux" | "archlabs" => (106, 230, 255),
+        "omarchy" | "manjaro" => (152, 255, 97),
+        "archcraft" => (131, 187, 173),
+        "garuda" => (125, 104, 225),
         "ubuntu" => (233, 84, 32),  
         "debian" => (215, 10, 83),  
         "fedora" => (60, 150, 230),  
