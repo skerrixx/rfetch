@@ -10,6 +10,9 @@ struct PackageCache {
     redhat: Option<usize>,
     void: Option<usize>,
     gentoo: Option<usize>,
+    alpine: Option<usize>,
+    flatpak: Option<usize>,
+    suse: Option<usize>,
     timestamp: SystemTime,
 }
 
@@ -69,6 +72,21 @@ fn get_installed_packages_parallel() -> String {
         }
     });
 
+    let alpine = thread::spawn(|| {
+            if Command::new("apk").arg("--version").output().is_ok() {
+                Command::new("apk")
+                    .arg("info")
+                    .output()
+                    .ok()
+                    .and_then(|o| {
+                        let count = String::from_utf8_lossy(&o.stdout).lines().count();
+                        if count > 0 { Some(count) } else { None }
+                    })
+            } else {
+                None
+            }
+        });
+
     let void = thread::spawn(|| {
         if Command::new("xbps-query").arg("--version").output().is_ok() {
             Command::new("xbps-query")
@@ -83,11 +101,40 @@ fn get_installed_packages_parallel() -> String {
             None
         }
     });
+	let flatpak = thread::spawn(|| {
+            if Command::new("flatpak").arg("--version").output().is_ok() {
+                Command::new("flatpak")
+                    .arg("list")
+                    .output()
+                    .ok()
+                    .and_then(|o| {
+                        let count = String::from_utf8_lossy(&o.stdout).lines().count();
+                        if count > 0 { Some(count) } else { None }
+                    })
+            } else {
+                None
+            }
+        });
 
     let gentoo = thread::spawn(|| {
         if Command::new("emerge").arg("--version").output().is_ok() {
             Command::new("qlist")
                 .arg("-Iv")
+                .output()
+                .ok()
+                .and_then(|o| {
+                    let count = String::from_utf8_lossy(&o.stdout).lines().count();
+                    if count > 0 { Some(count) } else { None }
+                })
+        } else {
+            None
+        }
+    });
+    let suse = thread::spawn(|| {
+        if Command::new("zypper").arg("--version").output().is_ok() {
+            Command::new("zypper")
+                .arg("se")
+                .arg("-i")
                 .output()
                 .ok()
                 .and_then(|o| {
@@ -105,6 +152,9 @@ fn get_installed_packages_parallel() -> String {
         redhat: redhat.join().unwrap_or(None),
         void: void.join().unwrap_or(None),
         gentoo: gentoo.join().unwrap_or(None),
+        alpine: alpine.join().unwrap_or(None),
+        flatpak: flatpak.join().unwrap_or(None),
+        suse: suse.join().unwrap_or(None),
         timestamp: SystemTime::now(),
     };
 
@@ -130,6 +180,15 @@ fn format_package_string(cache: &PackageCache) -> String {
     }
     if let Some(count) = cache.gentoo {
         parts.push(format!("{} (gent  )", count));
+    }
+    if let Some(count) = cache.alpine {
+        parts.push(format!("{} (alpine  )", count));
+    }
+    if let Some(count) = cache.flatpak {
+        parts.push(format!("{} (flatpak  )", count));
+    }
+    if let Some(count) = cache.suse {
+        parts.push(format!("{} (suse  )", count));
     }
 
     if parts.is_empty() {

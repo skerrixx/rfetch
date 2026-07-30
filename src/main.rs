@@ -3,6 +3,12 @@ mod basic;
 use pkgs::getform;
 use colored::Colorize;
 use std::env;
+use whoami;
+use rand;
+use std::thread;
+use std::time::Duration;
+use std::io::{self, Write};
+use std::process::Command;
 
 fn print_usage() {
     eprintln!("Usage: rfetch [--distro <distro> | -d <distro>] [--clear-cache]");
@@ -12,6 +18,52 @@ fn print_usage() {
     eprintln!("  --clear-cache           Force rebuild of package/drives cache");
     eprintln!();
     eprintln!("Available distros: {}", basic::known_distros().join(", "));
+    eprintln!("\nP.S. This fetch has superpowers. See 'rfetch --super'.")
+}
+
+fn random() {
+    let chosen: isize = rand::random_range(1..7) as isize;
+    match chosen {
+        1 => {
+            let desktop = env::var("XDG_CURRENT_DESKTOP").unwrap_or_else(|_| "rfetch".to_string());
+            println!("\"i use {} btw\" - (c) skerrix", desktop)
+        }
+        2 => {
+            if Command::new("neofetch").arg("--version").output().is_ok() {
+                println!("what's neofetch?");
+            }
+            else if Command::new("fastfetch").arg("--version").output().is_ok() {
+                println!("what's fastfetch?")
+            }
+            else if Command::new("hyfetch").arg("--version").output().is_ok() {
+                println!("what's hyfetch?")
+            }
+            else {
+                println!("good boy")
+            }
+        }
+        3 => {
+            println!("{}@pc ~ > paru -S opsec",whoami::username());
+            println!("[paru] error: package opsec isn't found. did you mean rfetch?")
+        }
+        4 => {
+            println!("welcome to rfetch super mode!");
+            print!("please wait, installing 47 miners...");
+            io::stdout().flush().unwrap();
+            thread::sleep(Duration::from_secs(3));
+            println!("done");
+            println!("thank you for using rfetch!")
+        }
+        5 => {
+            let facts = ["i'm gay", "🦀", "one of its suggested original names is larpfetch", "i dont know how to make multicolored ascii, because i'm dumb"];
+            println!("fun fact about rfetch: {}", facts[rand::random_range(0..facts.len() as usize)]);
+
+        }
+        6 => {
+            println!("{} is not in the rfetchers file. use virfetch to add yourself", whoami::username())
+        }
+        _ => {eprintln!("oops")}
+    }
 }
 
 fn main() {
@@ -37,6 +89,14 @@ fn main() {
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
+            }
+            "--super" => {
+                random();
+                std::process::exit(0);
+            }
+            "--version" => {
+                println!("rfetch v0.4.0\nby skerrix\nthanks to:\n   1. flingo\n   2. you, for using rfetch!");
+                std::process::exit(0)
             }
             _ => {
                 eprintln!("Error: unknown flag '{}'", args[i]);

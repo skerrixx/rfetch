@@ -1,4 +1,5 @@
 use std::process::Command;
+use std::collections::HashSet;
 use sysinfo::System;
 use gfxinfo;
 use whoami;
@@ -6,7 +7,7 @@ use starship_battery::Manager;
 use starship_battery::units::ratio::percent;
 
 fn os_id_or_name() -> String {
-    if std::fs::exists("/bedrock/strata/bedrock/etc/os-release").unwrap() {
+    if std::fs::exists("/bedrock/strata/bedrock/etc/osrelease").unwrap() {
         let content = match std::fs::read_to_string("/bedrock/strata/bedrock/etc/os-release") {
             Ok(c) => c,
             Err(_) => return String::from(""),
@@ -98,6 +99,7 @@ fn format(os: &str) -> &'static str {
         "rfetch" => "  rfetch", // yes
         "mist" => "  mist", // yes
         "chimera" => "󱗽 chimera", // yes
+        "alpine" => "  alpine", // yes
         _ => "  linux (unknown)", // yes
     }
 }
@@ -710,6 +712,24 @@ _____  18{          8888888888
 88888888888888  88888888888888
 88888888888888  88888888888888
 "#,
+        "alpine" => r#"
+       .:::::::::::::::::::::.
+      .:::::::::::::::::::::::.
+     .:::::::::::::::::::::::::.
+    .:::::::::::::::::::::::::::.
+   .:::::::::,db,::::::::::::::::.
+  .::::::::,d%%%%b,::,db,:::::::::.
+ .:::::::,%%%%P'%%%b,d%%%b,::::::::.
+.::::::,%%%%P,:::`%%%b'^q%%b,:::::::.
+'::::,%%%%P,:::::::`%%%b:'^%%b,:::::'
+ '::`%%%':'::::::::'q%%b'::`%%b'::'
+  ':::::::::::::::::::::::::::::::'
+   ':::::::::::::::::::::::::::::'
+    ':::::::::::::::::::::::::::'
+     ':::::::::::::::::::::::::'
+      ':::::::::::::::::::::::'
+       ':::::::::::::::::::::'
+        "#,
         _ => r#"  ___
          _nnnn_        
         dGGGGMMb       
@@ -726,7 +746,7 @@ _____  18{          8888888888
  |    `.       | `' \Zq
 _)      \.___.,|     .'
 \____   )MMMMMP|   .'  
-     `-'       `--' 
+  0   `-'       `--' 
 "#
     }
 }
@@ -764,6 +784,7 @@ pub fn get_logo_color(name: &str) -> (u8, u8, u8) {
         "rfetch" => (100, 230, 255), 
         "mist" => (180, 218, 215), 
         "chimera" => (214, 80, 95),
+        "alpine" => (13,89,127),
         _ => (255, 255, 255), 
     }
 }
@@ -827,7 +848,6 @@ pub fn rampercent() -> String {
 pub struct DiskInfo {
     pub name: String,
     pub filesystem: String,
-    pub mount_point: String,
     pub used_gb: f64,
     pub total_gb: f64,
     pub usage_pct: f64,
@@ -866,7 +886,7 @@ pub fn disks_info() -> Vec<DiskInfo> {
         if output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let mut lines = stdout.lines();
-            lines.next(); // skip header
+            lines.next();
             for line in lines {
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if parts.len() < 6 {
@@ -877,12 +897,15 @@ pub fn disks_info() -> Vec<DiskInfo> {
                 let fstype = parts[1];
                 let target = parts[2];
 
-                // Skip pseudo-filesystems and /boot
+
                 if target.starts_with("/boot") {
                     continue;
                 }
-                // Skip if source doesn't look like a real device (/dev/...)
                 if !source.starts_with("/dev/") {
+                    continue;
+                }
+
+                if fstype.starts_with("fuse.") || fstype == "fuse" {
                     continue;
                 }
 
@@ -903,12 +926,14 @@ pub fn disks_info() -> Vec<DiskInfo> {
                 result.push(DiskInfo {
                     name,
                     filesystem: fstype.to_string(),
-                    mount_point: target.to_string(),
                     used_gb: (used_gb * 10.0).round() / 10.0,
                     total_gb: (total_gb * 10.0).round() / 10.0,
                     usage_pct: (pct * 10.0).round() / 10.0,
                 });
             }
+
+            let mut seen = HashSet::new();
+            result.retain(|d| seen.insert(d.name.clone()));
 
             if !result.is_empty() {
                 return result;
@@ -917,20 +942,27 @@ pub fn disks_info() -> Vec<DiskInfo> {
     }
 
     let disks = sysinfo::Disks::new_with_refreshed_list();
+    let mut seen = HashSet::new();
     for disk in disks.list() {
         let fs_name = disk.file_system().to_string_lossy();
+        if fs_name == "fuse" || fs_name.starts_with("fuse.") {
+            continue;
+        }
+        if fs_name == "fusectl" {
+            continue;
+        }
         let skip_fs: &[&str] = &[
             "tmpfs", "devtmpfs", "squashfs", "overlay", "proc", "sysfs",
             "cgroup", "devpts", "hugetlbfs", "mqueue", "pstore",
             "securityfs", "efivarfs", "bpf", "tracefs", "debugfs",
-            "configfs", "fuse", "fusectl", "autofs", "efiivarfs",
+            "configfs", "autofs", "efiivarfs",
         ];
         if skip_fs.contains(&fs_name.as_ref()) {
             continue;
         }
 
-        let mount_point = disk.mount_point().to_string_lossy().to_string();
-        if mount_point.starts_with("/boot") {
+        let mountpoint = disk.mount_point().to_string_lossy().to_string();
+        if mountpoint.starts_with("/boot") {
             continue;
         }
 
@@ -948,10 +980,13 @@ pub fn disks_info() -> Vec<DiskInfo> {
 
         let fstype = disk.file_system().to_string_lossy().to_string();
 
+        let dev_name = name.to_string();
+        if !seen.insert(dev_name.clone()) {
+            continue;
+        }
         result.push(DiskInfo {
-            name: name.to_string(),
+            name: dev_name,
             filesystem: fstype,
-            mount_point: mount_point.clone(),
             used_gb: (used * 10.0).round() / 10.0,
             total_gb: (total * 10.0).round() / 10.0,
             usage_pct: (pct * 10.0).round() / 10.0,
@@ -961,19 +996,7 @@ pub fn disks_info() -> Vec<DiskInfo> {
     result
 }
 
-pub fn disktot() -> u64 {
-    let disks = sysinfo::Disks::new_with_refreshed_list();
-    let disk = &disks.list()[0];
-    let gb = 1024 * 1024 * 1024;
-    disk.total_space() / gb
-}
 
-pub fn diskuse() -> u64 {
-    let disks = sysinfo::Disks::new_with_refreshed_list();
-    let disk = &disks.list()[0];
-    let gb = 1024 * 1024 * 1024;
-    (disk.total_space() - disk.available_space()) / gb
-}
 
 pub fn kernel() -> String {
     let output = Command::new("uname").arg("-sr").output().expect("");
