@@ -32,7 +32,7 @@ fn os_id_or_name() -> String {
         extract_value(&content, "ID")
             .or_else(|| extract_value(&content, "NAME"))
             .unwrap_or_default()
-    } else {
+    } else if std::fs::exists("/etc/os-release").unwrap() {
         let content = match std::fs::read_to_string("/etc/os-release") {
             Ok(c) => c,
             Err(_) => return String::from(""),
@@ -55,6 +55,10 @@ fn os_id_or_name() -> String {
         extract_value(&content, "ID")
             .or_else(|| extract_value(&content, "NAME"))
             .unwrap_or_default()
+    }
+    else {
+        let os = String::from_utf8(Command::new("uname").arg("s").output().expect("").stdout).expect("").to_string().to_lowercase();
+        return os;
     }
 }
 
@@ -103,6 +107,7 @@ fn format(os: &str) -> &'static str {
         "chimera" => "󱗽  chimera", // yes
         "alpine" => "  alpine", // yes
         "zerene" => "  zereneos",
+        "netbsd" => "󰉀  netbsd",
         _ => "  linux (unknown)", // yes
     }
 }
@@ -752,6 +757,18 @@ _____  18{          8888888888
         .:d0Wd
            .,.
 "#,
+        "netbsd" => r#"
+ _
+ \\`-______,----__
+  \\        __,---`_
+   \\       `.____
+    \\-______,----`-
+     \\
+      \\
+       \\
+        \\
+         \\-
+"#,
         _ => r#"  ___
          _nnnn_        
         dGGGGMMb       
@@ -808,6 +825,7 @@ pub fn get_logo_color(name: &str) -> (u8, u8, u8) {
         "chimera" => (214, 80, 95),
         "alpine" => (13,89,127),
         "zerene" => (118, 75, 235),
+        "netbsd" => (245, 152, 66),
         _ => (255, 255, 255), 
     }
 }

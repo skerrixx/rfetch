@@ -13,6 +13,7 @@ struct PackageCache {
     alpine: Option<usize>,
     flatpak: Option<usize>,
     suse: Option<usize>,
+    netbsd: Option<usize>,
     timestamp: SystemTime,
 }
 
@@ -145,6 +146,20 @@ fn get_installed_packages_parallel() -> String {
             None
         }
     });
+    let netbsd = thread::spawn(|| {
+        if Command::new("pkg_info").arg("--version").output().is_ok() {
+            Command::new("pkg_info")
+                .arg("-q")
+                .output()
+                .ok()
+                .and_then(|o| {
+                    let count = String::from_utf8_lossy(&o.stdout).lines().count();
+                    if count > 0 { Some(count) } else { None }
+                })
+        } else {
+            None
+        }
+    });
 
     let cache = PackageCache {
         debian: debian.join().unwrap_or(None),
@@ -155,6 +170,7 @@ fn get_installed_packages_parallel() -> String {
         alpine: alpine.join().unwrap_or(None),
         flatpak: flatpak.join().unwrap_or(None),
         suse: suse.join().unwrap_or(None),
+        netbsd: netbsd.join().unwrap_or(None),
         timestamp: SystemTime::now(),
     };
 
