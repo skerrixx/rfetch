@@ -75,6 +75,7 @@ fn format(os: &str) -> &'static str {
 		"endeavour" | "endeavouros" => "  endeavour", // yes
 		"archlabs" => "  archlabs", // yes
 		"archcraft" => "  archcraft", // yes
+		"kyon" => " kyon linux", // yes
 		"garuda" => "  garuda", // yes
         "debian" => " debian", // yes
         "ubuntu" => "󰕈 ubuntu", // yes
@@ -247,6 +248,25 @@ pub fn get_ascii_art(name: &str) -> &'static str {
  ⣠⣿⣿⣿⣿⠿⠛⠋⠁                    ⠉⠙⠻⢿⣿⣿⣿⣿⣆ 
 ⡰⠟⠛⠉⠁                              ⠉⠙⠛⠿⢆
 "#,
+	"kyon" => r#"
+```                l                                 
+              .dxxdolc.x.                         
+             ;xxxxxxxxkK0oc;                      
+            oxxxxxxxxk0K0x:'.oolc.                
+          .dxxxxxxxxx0Kd    cxxxxxdolc'           
+         'xxxodxxxxx0KO    ;kxxxxxxxxxxxdol:      
+        cd'.   lxxxOKK'   .00kxxxxxxxxxxxxxxxdolc.
+   cclldkko     cOOKKl    kK0xdldo0000000000Oxdd  
+     ;KKKKKO.    :KKk    lOo;odxOOKKKKKKK0kxddc   
+    :xxkO0KK0'    '0.     ';o0KKKKKKKK0Oxdddd'    
+   oxxxxxxkO00;        .      .,lkK0Oxdddddd      
+ .dxxxxxxxxxdxkc      :K0xc'       .,cddddo       
+  odddddddddddd0d     oKKKKKKko;.      .:;        
+       'ddddddkKKk.    cKKKKKKKKK0xc,:od.         
+             d0KKK0.    'xO0KKKKKKKKOdd           
+             oKKKKK0,  .'lddxkO00KKKKo            
+            .KKo       .dddddddddxkOkK'           
+                             oddddd  "#,
 	"garuda" => r#"
              .:loooodddddd:.
            .:l:.         .cd:.
@@ -794,6 +814,7 @@ pub fn get_logo_color(name: &str) -> (u8, u8, u8) {
     let v = normalize(name);
     match v.as_str() {
         "arch" | "archlinux" | "artix" | "artixlinux" | "archlabs" => (106, 230, 255),
+        "kyon" => (0, 219, 219),
         "omarchy" | "manjaro" => (152, 255, 97),
         "archcraft" => (131, 187, 173),
         "garuda" => (125, 104, 225),

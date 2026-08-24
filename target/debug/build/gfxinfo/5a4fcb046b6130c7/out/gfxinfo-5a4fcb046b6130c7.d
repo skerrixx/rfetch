@@ -1,0 +1,12 @@
+/home/skerrix/rfetch/target/debug/build/gfxinfo/5a4fcb046b6130c7/out/gfxinfo-5a4fcb046b6130c7.d: /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/lib.rs /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/nvidia.rs /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/linux/mod.rs /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/linux/amd.rs /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/linux/intel.rs /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/util/mod.rs /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/util/pci.rs /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/../README.md
+
+/home/skerrix/rfetch/target/debug/build/gfxinfo/5a4fcb046b6130c7/out/libgfxinfo-5a4fcb046b6130c7.rmeta: /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/lib.rs /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/nvidia.rs /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/linux/mod.rs /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/linux/amd.rs /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/linux/intel.rs /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/util/mod.rs /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/util/pci.rs /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/../README.md
+
+/home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/lib.rs:
+/home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/nvidia.rs:
+/home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/linux/mod.rs:
+/home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/linux/amd.rs:
+/home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/linux/intel.rs:
+/home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/util/mod.rs:
+/home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/util/pci.rs:
+/home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gfxinfo-0.1.2/src/../README.md:

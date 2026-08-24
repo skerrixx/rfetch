@@ -1,0 +1,1 @@
+{"rustc":848366992725228166,"features":"","declared_features":"","target":0,"profile":0,"path":0,"deps":[[10684107345137278605,"build_script_build",false,3419388532265083507]],"local":[{"RerunIfChanged":{"output":"release/build/crossbeam-deque/9a381c9246b1c148/run/stdout","paths":["build.rs"]}}],"rustflags":[],"config":0,"compile_kind":0}
