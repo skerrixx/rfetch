@@ -1,8 +1,0 @@
-/home/skerrix/rfetch/target/debug/build/unicode-ident/c763a785dc3ccbf7/out/unicode_ident-c763a785dc3ccbf7.d: /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-ident-1.0.24/src/lib.rs /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-ident-1.0.24/src/tables.rs
-
-/home/skerrix/rfetch/target/debug/build/unicode-ident/c763a785dc3ccbf7/out/libunicode_ident-c763a785dc3ccbf7.rlib: /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-ident-1.0.24/src/lib.rs /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-ident-1.0.24/src/tables.rs
-
-/home/skerrix/rfetch/target/debug/build/unicode-ident/c763a785dc3ccbf7/out/libunicode_ident-c763a785dc3ccbf7.rmeta: /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-ident-1.0.24/src/lib.rs /home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-ident-1.0.24/src/tables.rs
-
-/home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-ident-1.0.24/src/lib.rs:
-/home/skerrix/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-ident-1.0.24/src/tables.rs:

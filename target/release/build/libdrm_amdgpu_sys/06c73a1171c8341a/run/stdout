@@ -1,2 +1,0 @@
-cargo:rustc-link-lib=drm
-cargo:rustc-link-lib=drm_amdgpu
