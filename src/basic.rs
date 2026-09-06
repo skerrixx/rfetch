@@ -138,25 +138,15 @@ pub fn get_ascii_art(name: &str) -> &'static str {
     let v = normalize(name);
     match v.as_str() {
         "arch" | "archlinux" => r#"
-                   -`
-                  .o+`
-                 `ooo/
-                `+oooo:
-               `+oooooo:
-               -+oooooo+:
-             `/:-:++oooo+:
-            `/++++/+++++++:
-           `/++++++++++++++:
-          `/+++ooooooooooooo/`
-         ./ooosssso++osssssso+`
-        .oossssso-````/ossssss+`
-       -osssssso.      :ssssssso.
-      :osssssss/        osssso+++.
-     /ossssssss/        +ssssooo/-
-   `/ossssso+/:-        -:/+osssso+-
-  `+sso+:-`                 `.-/+oso:
- `++:.                           `-/+/
- .`                                 `
+          /\
+         /  \ 
+        /    \ 
+       _\     \ 
+      /        \ 
+     /          \ 
+    /     __   \_\  
+   /     /  \     \
+  /__,--'    '--,__\
 "#,
 	"artix" | "artixlinux" => r#"
             '
@@ -1094,15 +1084,15 @@ pub fn disks_info() -> Vec<DiskInfo> {
 pub fn wmde() -> String {
 	let unp_de = env::var("XDG_CURRENT_DESKTOP").unwrap_or_else(|_| "rfetch".to_string());
 	match unp_de.to_lowercase().as_str() {
-		"gnome" => String::from(" gnome"),
-		"kde" | "plasma" => String::from(" kde"),
-		"niri" => String::from(" niri"),
-		"hyprland" => String::from(" hypr"),
-		"xfce" => String::from(" xfce"),
-		"sway" => String::from(" sway"),
-		"i3" => String::from(" i3"),
+		"gnome" => String::from(" gnome"),
+		"kde" | "plasma" => String::from(" kde"),
+		"niri" => String::from(" niri"),
+		"hyprland" => String::from(" hypr"),
+		"xfce" => String::from(" xfce"),
+		"sway" => String::from(" sway"),
+		"i3" => String::from(" i3"),
 		"mango" | "mangowm" => String::from("󱁆 mango"),
-		"cinnamon" | "x-cinnamon" => String::from(" cinnamon"),
+		"cinnamon" | "x-cinnamon" => String::from(" cinnamon"),
 		_ => format!(" {}", unp_de.to_lowercase())
 	}
 }
@@ -1110,11 +1100,11 @@ pub fn kernel() -> String {
     if is_termux() {
         if let Ok(ver) = std::fs::read_to_string("/proc/version") {
             let version = ver.split_whitespace().nth(2).unwrap_or("unknown");
-            return format!("Linux {}", version);
+            return format!("󰌽 linux {}", version);
         }
     }
     std::fs::read_to_string("/proc/sys/kernel/osrelease")
-        .map(|s| format!("Linux {}", s.trim()))
+        .map(|s| format!("󰌽 linux {}", s.trim()))
         .unwrap_or_else(|_| {
             let output = Command::new("uname").arg("-sr").output().expect("");
             String::from_utf8_lossy(&output.stdout).trim().to_string()
@@ -1145,11 +1135,11 @@ pub fn shell() -> String {
         sh_unp = String::from("unknown");
     };
     match sh_unp.as_str() {
-        "fish" => "\u{f021a} fish".to_string(),
-        "bash" => "\u{e795} bash".to_string(),
-        "zsh" => "\u{f0c36} zsh".to_string(),
-        "sh" => "\u{f1211} sh".to_string(),
-        _ => "\u{f07b2} unknown".to_string()
+        "fish" => " fish".to_string(),
+        "bash" => " bash".to_string(),
+        "zsh" => " zsh".to_string(),
+        "sh" => " sh".to_string(),
+        _ => " unknown".to_string()
     }
 }
 
@@ -1172,12 +1162,13 @@ pub fn terminal() -> String {
     }
     if !unp_t.is_empty() {
         return match unp_t.to_lowercase().as_str() {
-            "alacritty" => "\u{f02d8} alacritty".to_string(),
-            "xterm-kitty" => "\u{eb99} kitty".to_string(),
-            "tabby" => "\u{f021b} tabby.sh".to_string(),
-            "foot" => "\u{f025c} foot".to_string(),
-            "xterm-256color" => "\u{f1219} de terminal".to_string(),
-            _ => format!("\u{e795} {}", unp_t.to_lowercase())
+            "alacritty" => "󱐋 alacritty".to_string(),
+            "xterm-kitty" => " kitty".to_string(),
+            "tabby" => " tabby".to_string(),
+            "foot" => " foot".to_string(),
+            "xterm-256color" => " DE terminal".to_string(),
+            "xterm-ghostty" => "󰊠 ghostty".to_string(),
+            _ => format!(" {}", unp_t.to_lowercase())
         }
     }
 

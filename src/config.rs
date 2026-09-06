@@ -13,6 +13,8 @@ pub struct Config {
     pub color_infotext: String,
     #[serde(default = "defhide")]
     pub hide_info: Vec<String>,
+	#[serde(default = "defstyle")]
+	pub style: String
 }
 
 fn defbeta() -> bool {
@@ -27,6 +29,10 @@ fn deficolor() -> String {
     "white".to_string()
 }
 
+fn defstyle() -> String {
+    "sectioned".to_string()
+}
+
 fn defhide() -> Vec<String> {
     Vec::new()
 }
@@ -38,6 +44,7 @@ impl Default for Config {
             color_ascii: defacolor(),
             color_infotext: deficolor(),
             hide_info: defhide(),
+			style: defstyle()
         }
     }
 }
@@ -110,7 +117,7 @@ fn strip_comments(input: &str) -> String {
 
 fn default_config_content(show_beta: bool) -> String {
     format!(
-        "{{\n\t\"show_beta\": {},\n\t\"color_ascii\": true,\n\t\"color_infotext\": \"white\",\n\t\"hide_info\": [\n\t\t/* \n\t\tuncomment any string below to hide the info about it.\n\t\tbeta features cannot be hidden unless you set show_beta to false\n\t\t*/\n\t\t // \"headers\"\n\t\t // \"packages\"\n\t\t // \"os\"\n\t\t // \"kernel\"\n\t\t // \"uptime\"\n\t\t // \"cpu\"\n\t\t // \"gpu\"\n\t\t // \"ram\"\n\t\t // \"disk\"\n\t\t // \"battery\" //(only hides it if it's present at all)\n\t]\n}}\n",
+        "{{\n\t\"show_beta\": {},\n\t\"color_ascii\": true,\n\t\"color_infotext\": \"white\",\n\t\"hide_info\": [\n\t\t/* \n\t\tuncomment any string below to hide the info about it.\n\t\tbeta features cannot be hidden unless you set show_beta to false\n\t\t*/\n\t\t // \"headers\"\n\t\t // \"packages\"\n\t\t // \"os\"\n\t\t // \"kernel\"\n\t\t // \"uptime\"\n\t\t // \"cpu\"\n\t\t // \"gpu\"\n\t\t // \"ram\"\n\t\t // \"disk\"\n\t\t // \"battery\" //(only hides it if it's present at all)\n\t],\n\t\"style\": \"sectioned\" // options: sectioned/boxed\n}}\n",
         show_beta
     )
 }

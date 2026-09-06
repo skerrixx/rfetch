@@ -84,37 +84,37 @@ fn format_package_string(cache: &PackageCache) -> String {
     let mut parts = Vec::new();
     
     if let Some(count) = cache.debian {
-        parts.push(format!("{} (deb  )", count));
+        parts.push(format!("{} (deb  )", count));
     }
     if let Some(count) = cache.arch {
         parts.push(format!("{} (arch 󰣇 )", count));
     }
     if let Some(count) = cache.redhat {
-        parts.push(format!("{} (dnf  )", count));
+        parts.push(format!("{} (dnf  )", count));
     }
     if let Some(count) = cache.void {
-        parts.push(format!("{} (void  )", count));
+        parts.push(format!("{} (void  )", count));
     }
     if let Some(count) = cache.gentoo {
-        parts.push(format!("{} (gent  )", count));
+        parts.push(format!("{} (gent 󰣨 )", count));
     }
     if let Some(count) = cache.alpine {
-        parts.push(format!("{} (alpine  )", count));
+        parts.push(format!("{} (alpine  )", count));
     }
     if let Some(count) = cache.flatpak {
-        parts.push(format!("{} (flatpak  )", count));
+        parts.push(format!("{} (flatpak 󰏖 )", count));
     }
     if let Some(count) = cache.suse {
-        parts.push(format!("{} (suse  )", count));
+        parts.push(format!("{} (suse  )", count));
     }
     if let Some(count) = cache.termux {
-        parts.push(format!("{} (termux \u{f17c} )", count));
+        parts.push(format!("{} (termux  )", count));
     }
 
     if parts.is_empty() {
-        "|  packages: none found".to_string()
+        "none found".to_string()
     } else {
-        format!(" packages: {}", parts.join(", "))
+        format!("{}", parts.join(", "))
     }
 }
 
