@@ -10,6 +10,7 @@ use std::thread;
 use std::time::Duration;
 use std::io::{self, Write};
 use std::process::Command;
+use sysinfo::System;
 
 fn print_usage() {
     eprintln!("Usage: rfetch [--distro <distro> | -d <distro>] [--clear-cache]");
@@ -110,11 +111,11 @@ fn main() {
                 std::process::exit(0);
             }
             "--version" => {
-                println!("rfetch v0.4.0\nby skerrix\nthanks to:\n   1. flingo\n   2. you, for using rfetch!");
+                println!("rfetch v0.7.0\nby skerrix and fxrncyy\nthanks to:\n   1. flingo\n   2. you, for using rfetch!");
                 std::process::exit(0)
             }
             _ => {
-                // just print the fetch if a flag is unknown
+                // just print the fetch if a flag is unknown (yeah skerrix youre very good at commenting)
             }
         }
         i += 1;
@@ -165,24 +166,69 @@ fn main() {
             software.push(getform());
         }
         if !hidden("os") {
-            software.push(format!("  os: {}", os_display));
+            software.push(format!("  os: {}", os_display));
         }
+
+        let mut kernel_val = String::new();
+        let mut uptime_val = String::new();
+        let mut gpu_val = String::new();
+        let mut disk_infos = Vec::new();
+        let mut battery_charge: usize = 500;
+
+        thread::scope(|s| {
+            let h_kernel = if !hidden("kernel") {
+                Some(s.spawn(|| basic::kernel()))
+            } else {
+                None
+            };
+            let h_uptime = if !hidden("uptime") {
+                Some(s.spawn(|| basic::uptime()))
+            } else {
+                None
+            };
+            let h_gpu = if !hidden("gpu") {
+                Some(s.spawn(|| basic::gpu()))
+            } else {
+                None
+            };
+            let h_disks = if !hidden("disk") {
+                Some(s.spawn(|| basic::disks_info()))
+            } else {
+                None
+            };
+            let h_battery = s.spawn(|| basic::get_battery_charge());
+
+            if let Some(h) = h_kernel {
+                kernel_val = h.join().unwrap_or_default();
+            }
+            if let Some(h) = h_uptime {
+                uptime_val = h.join().unwrap_or_default();
+            }
+            if let Some(h) = h_gpu {
+                gpu_val = h.join().unwrap_or_default();
+            }
+            if let Some(h) = h_disks {
+                disk_infos = h.join().unwrap_or_default();
+            }
+            battery_charge = h_battery.join().unwrap_or(500);
+        });
+
         if !hidden("kernel") {
-            software.push(format!("  kernel: {}", basic::kernel()));
+            software.push(format!("  kernel: {}", kernel_val));
         }
         if cfg.show_beta {
             if !hidden("de/wm") && !hidden("dewm") && !hidden("de") {
-                software.push(format!("  de/wm: {}", basic::wmde()));
+                software.push(format!("  de/wm: {}", basic::wmde()));
             }
             if !hidden("shell") {
-                software.push(format!("  shell: {}", basic::shell()));
+                software.push(format!("  shell: {}", basic::shell()));
             }
             if !hidden("terminal") {
-                software.push(format!("  terminal: {}", basic::terminal()));
+                software.push(format!("  terminal: {}", basic::terminal()));
             }
         }
         if !hidden("uptime") {
-            software.push(format!("  uptime: {}", basic::uptime()));
+            software.push(format!("  uptime: {}", uptime_val));
         }
 
         for (i, line) in software.iter().enumerate() {
@@ -195,42 +241,40 @@ fn main() {
             ));
         }
 
-        let disk_infos = basic::disks_info();
-        let battery_charge = basic::get_battery_charge();
         let has_battery = battery_charge != 500;
 
         if !hidden("headers") {
             v.push(format!("{}{}", "  ".cyan(), "┏━ hardware"));
         }
 
+        let sys = System::new_all();
         let mut hardware: Vec<String> = Vec::new();
         if !hidden("cpu") {
-            hardware.push(format!("  cpu: {}", basic::cpu()));
+            hardware.push(format!("  cpu: {}", basic::cpu(&sys)));
         }
         if !hidden("gpu") {
-            hardware.push(format!("󰢮  gpu: {}", basic::gpu()));
+            hardware.push(format!("󰢮  gpu: {}", gpu_val));
         }
         if !hidden("ram") {
+            let (used, total, pct) = basic::ram_info(&sys);
             hardware.push(format!(
-                "  ram: {} gib / {} gib ({}%)",
-                basic::ramuse(),
-                basic::ramtotal(),
-                basic::rampercent()
+                "  ram: {} gib / {} gib ({}%)",
+                used, total, pct
             ));
         }
         if !hidden("disk") {
             for disk in disk_infos.iter() {
                 hardware.push(format!(
-                    "  disk ({}, {}): {} gib / {} gib ({}%)",
+                    "  disk ({}, {}): {} gib / {} gib ({}%)",
                     disk.name, disk.filesystem, disk.used_gb, disk.total_gb, disk.usage_pct,
                 ));
             }
         }
         if has_battery && !hidden("battery") {
             if battery_charge <= 20 {
-                hardware.push(format!("  battery: {}% . charge, maybe?", battery_charge));
+                hardware.push(format!("  battery: {}% . charge, maybe?", battery_charge));
             } else {
-                hardware.push(format!("  battery: {}%", battery_charge));
+                hardware.push(format!("  battery: {}%", battery_charge));
             }
         }
 

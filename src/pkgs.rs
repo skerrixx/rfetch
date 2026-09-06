@@ -14,12 +14,35 @@ struct PackageCache {
     flatpak: Option<usize>,
     suse: Option<usize>,
     netbsd: Option<usize>,
+    termux: Option<usize>,
     timestamp: SystemTime,
 }
 
+fn count_packages(cmd: &str, args: &[&str]) -> Option<usize> {
+    Command::new(cmd)
+        .args(args)
+        .output()
+        .ok()
+        .and_then(|o| {
+            if !o.status.success() {
+                return None;
+            }
+            let count = String::from_utf8_lossy(&o.stdout).lines().count();
+            if count > 0 { Some(count) } else { None }
+        })
+}
+
+fn cache_path() -> String {
+    if let Ok(tmpdir) = std::env::var("TMPDIR") {
+        format!("{}/rfetch_packages.json", tmpdir)
+    } else {
+        "/tmp/rfetch_packages.json".to_string()
+    }
+}
+
 fn get_installed_packages_parallel() -> String {
-    let cache_path = "/tmp/rfetch_packages.json";
-    if let Ok(data) = std::fs::read_to_string(cache_path) {
+    let cp = cache_path();
+    if let Ok(data) = std::fs::read_to_string(&cp) {
         if let Ok(cache) = serde_json::from_str::<PackageCache>(&data) {
             if cache.timestamp.elapsed().unwrap_or_default() < Duration::from_secs(3600) {
                 return format_package_string(&cache);
@@ -27,139 +50,16 @@ fn get_installed_packages_parallel() -> String {
         }
     }
 
-    let debian = thread::spawn(|| {
-        if Command::new("dpkg").arg("--version").output().is_ok() {
-            Command::new("dpkg")
-                .arg("--get-selections")
-                .output()
-                .ok()
-                .and_then(|o| {
-                    let count = String::from_utf8_lossy(&o.stdout).lines().count();
-                    if count > 0 { Some(count) } else { None }
-                })
-        } else {
-            None
-        }
-    });
-
-    let arch = thread::spawn(|| {
-        if Command::new("pacman").arg("--version").output().is_ok() {
-            Command::new("pacman")
-                .arg("-Q")
-                .output()
-                .ok()
-                .and_then(|o| {
-                    let count = String::from_utf8_lossy(&o.stdout).lines().count();
-                    if count > 0 { Some(count) } else { None }
-                })
-        } else {
-            None
-        }
-    });
-
-    let redhat = thread::spawn(|| {
-        if Command::new("dnf").arg("--version").output().is_ok() {
-            Command::new("dnf")
-                .arg("list")
-                .arg("--installed")
-                .output()
-                .ok()
-                .and_then(|o| {
-                    let count = String::from_utf8_lossy(&o.stdout).lines().count();
-                    if count > 0 { Some(count) } else { None }
-                })
-        } else {
-            None
-        }
-    });
-
-    let alpine = thread::spawn(|| {
-            if Command::new("apk").arg("--version").output().is_ok() {
-                Command::new("apk")
-                    .arg("info")
-                    .output()
-                    .ok()
-                    .and_then(|o| {
-                        let count = String::from_utf8_lossy(&o.stdout).lines().count();
-                        if count > 0 { Some(count) } else { None }
-                    })
-            } else {
-                None
-            }
-        });
-
-    let void = thread::spawn(|| {
-        if Command::new("xbps-query").arg("--version").output().is_ok() {
-            Command::new("xbps-query")
-                .arg("-l")
-                .output()
-                .ok()
-                .and_then(|o| {
-                    let count = String::from_utf8_lossy(&o.stdout).lines().count();
-                    if count > 0 { Some(count) } else { None }
-                })
-        } else {
-            None
-        }
-    });
-	let flatpak = thread::spawn(|| {
-            if Command::new("flatpak").arg("--version").output().is_ok() {
-                Command::new("flatpak")
-                    .arg("list")
-                    .output()
-                    .ok()
-                    .and_then(|o| {
-                        let count = String::from_utf8_lossy(&o.stdout).lines().count();
-                        if count > 0 { Some(count) } else { None }
-                    })
-            } else {
-                None
-            }
-        });
-
-    let gentoo = thread::spawn(|| {
-        if Command::new("emerge").arg("--version").output().is_ok() {
-            Command::new("qlist")
-                .arg("-Iv")
-                .output()
-                .ok()
-                .and_then(|o| {
-                    let count = String::from_utf8_lossy(&o.stdout).lines().count();
-                    if count > 0 { Some(count) } else { None }
-                })
-        } else {
-            None
-        }
-    });
-    let suse = thread::spawn(|| {
-        if Command::new("zypper").arg("--version").output().is_ok() {
-            Command::new("zypper")
-                .arg("se")
-                .arg("-i")
-                .output()
-                .ok()
-                .and_then(|o| {
-                    let count = String::from_utf8_lossy(&o.stdout).lines().count();
-                    if count > 0 { Some(count) } else { None }
-                })
-        } else {
-            None
-        }
-    });
-    let netbsd = thread::spawn(|| {
-        if Command::new("pkg_info").arg("--version").output().is_ok() {
-            Command::new("pkg_info")
-                .arg("-q")
-                .output()
-                .ok()
-                .and_then(|o| {
-                    let count = String::from_utf8_lossy(&o.stdout).lines().count();
-                    if count > 0 { Some(count) } else { None }
-                })
-        } else {
-            None
-        }
-    });
+    let debian = thread::spawn(|| count_packages("dpkg", &["--get-selections"]));
+    let arch = thread::spawn(|| count_packages("pacman", &["-Q"]));
+    let redhat = thread::spawn(|| count_packages("dnf", &["list", "--installed"]));
+    let alpine = thread::spawn(|| count_packages("apk", &["info"]));
+    let void = thread::spawn(|| count_packages("xbps-query", &["-l"]));
+    let flatpak = thread::spawn(|| count_packages("flatpak", &["list"]));
+    let gentoo = thread::spawn(|| count_packages("qlist", &["-Iv"]));
+    let suse = thread::spawn(|| count_packages("zypper", &["se", "-i"]));
+    let netbsd = thread::spawn(|| count_packages("pkg_info", &["-q"]));
+    let termux = thread::spawn(|| count_packages("dpkg-query", &["-f", "${Status}\n", "--show"]));
 
     let cache = PackageCache {
         debian: debian.join().unwrap_or(None),
@@ -171,10 +71,11 @@ fn get_installed_packages_parallel() -> String {
         flatpak: flatpak.join().unwrap_or(None),
         suse: suse.join().unwrap_or(None),
         netbsd: netbsd.join().unwrap_or(None),
+        termux: termux.join().unwrap_or(None),
         timestamp: SystemTime::now(),
     };
 
-    let _ = std::fs::write(cache_path, serde_json::to_string(&cache).unwrap());
+    let _ = std::fs::write(&cp, serde_json::to_string(&cache).unwrap());
 
     format_package_string(&cache)
 }
@@ -183,40 +84,42 @@ fn format_package_string(cache: &PackageCache) -> String {
     let mut parts = Vec::new();
     
     if let Some(count) = cache.debian {
-        parts.push(format!("{} (deb  )", count));
+        parts.push(format!("{} (deb  )", count));
     }
     if let Some(count) = cache.arch {
         parts.push(format!("{} (arch 󰣇 )", count));
     }
     if let Some(count) = cache.redhat {
-        parts.push(format!("{} (dnf  )", count));
+        parts.push(format!("{} (dnf  )", count));
     }
     if let Some(count) = cache.void {
-        parts.push(format!("{} (void  )", count));
+        parts.push(format!("{} (void  )", count));
     }
     if let Some(count) = cache.gentoo {
-        parts.push(format!("{} (gent  )", count));
+        parts.push(format!("{} (gent  )", count));
     }
     if let Some(count) = cache.alpine {
-        parts.push(format!("{} (alpine  )", count));
+        parts.push(format!("{} (alpine  )", count));
     }
     if let Some(count) = cache.flatpak {
-        parts.push(format!("{} (flatpak  )", count));
+        parts.push(format!("{} (flatpak  )", count));
     }
     if let Some(count) = cache.suse {
-        parts.push(format!("{} (suse  )", count));
+        parts.push(format!("{} (suse  )", count));
+    }
+    if let Some(count) = cache.termux {
+        parts.push(format!("{} (termux \u{f17c} )", count));
     }
 
     if parts.is_empty() {
-        "|   packages: none found".to_string()
+        "|  packages: none found".to_string()
     } else {
-        format!("  packages: {}", parts.join(", "))
+        format!(" packages: {}", parts.join(", "))
     }
 }
 
 pub fn clear_cache() {
-    let cache_path = "/tmp/rfetch_packages.json";
-    let _ = std::fs::remove_file(cache_path);
+    let _ = std::fs::remove_file(cache_path());
 }
 
 pub fn getform() -> String {
