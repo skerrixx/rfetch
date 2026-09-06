@@ -8,7 +8,22 @@ use whoami;
 use starship_battery::Manager;
 use starship_battery::units::ratio::percent;
 
+pub fn is_termux() -> bool {
+    if env::var("TERMUX_VERSION").is_ok() {
+        return true;
+    }
+    if let Ok(prefix) = env::var("PREFIX") {
+        if prefix.contains("com.termux") {
+            return true;
+        }
+    }
+    std::fs::exists("/data/data/com.termux").unwrap_or(false)
+}
+
 fn os_id_or_name() -> String {
+    if is_termux() {
+        return String::from("android");
+    }
     if std::fs::exists("/bedrock/strata/bedrock/etc/os-release").unwrap() {
         let content = match std::fs::read_to_string("/bedrock/strata/bedrock/etc/os-release") {
             Ok(c) => c,
@@ -109,6 +124,7 @@ fn format(os: &str) -> &'static str {
         "alpine" => "  alpine", // yes
         "zerene" => "  zereneos",
         "netbsd" => "󰉀  netbsd",
+        "android" => " android",
         _ => "  linux (unknown)", // yes
     }
 }
@@ -461,17 +477,27 @@ yMMNNNNNNNmmmmmNiii;;;,,
                                         .  
 "#,
 	"cachyos" => r#"
-     ...........
-    /-++======/
-   /++-++====/   ()
-  /==++-+/
- /====++/     /''\
-/======/      \,,/
-\,,,,,,\            ,_,
- \,,....\          /   \
-  \...,..\_________`-_-'
-   \+=============/
-    \+++=========/
+          .+=========================.
+         :++===++==================-        :++-
+        :*++====+++++=============-        .==:
+       -*+++=====+***++==========:
+      =*++++========------------:
+     =*+++++=====-                     ...
+   .+*+++++=-===:                    .=+++=:
+  :++++=====-==:                     -*****+
+ :++========-=.                      .=++**+.
+.+==========-.                          .
+:+++++++====-                                .--==-.
+ :++==========.                             :+++++++:
+  .-===========.                            =*****+*+
+   .-===========:                           .+*****+:
+     -=======++++:::::::::::::::::::::::::-:  .---:
+      :======++++====+++******************=.
+       :=====+++==========++++++++++++++*-
+        .====++==============++++++++++*-
+         .===+==================+++++++:
+          .-=======================+++:
+            ..........................
 "#,
 	"void" => r#"
             ⣀⣀⣠⣤⣴⣶⣿⣿⣿⣶⣶⣦⣤⣄⡀          
@@ -789,6 +815,26 @@ _____  18{          8888888888
         \\
          \\-
 "#,
+	"android" | "termux" => r#"
+          -o         o-
+          +hydNNNNdyh+
+        +mMMMMMMMMMMMMm+
+      `dMMm:NMMMMMMN:mMMd`
+      hMMMMMMMMMMMMMMMMMMh
+  ..  yyyyyyyyyyyyyyyyyyyy  ..
+.mMMm`MMMMMMMMMMMMMMMMMMMM`mMMm.
+:MMMM-MMMMMMMMMMMMMMMMMMMM-MMMM:
+:MMMM-MMMMMMMMMMMMMMMMMMMM-MMMM:
+:MMMM-MMMMMMMMMMMMMMMMMMMM-MMMM:
+:MMMM-MMMMMMMMMMMMMMMMMMMM-MMMM:
+-MMMM-MMMMMMMMMMMMMMMMMMMM-MMMM-
+ +yy+ MMMMMMMMMMMMMMMMMMMM +yy+
+      mMMMMMMMMMMMMMMMMMMm
+      `/++MMMMh++hMMMM++/`
+          MMMMo  oMMMM
+          MMMMo  oMMMM
+          oNMm-  -mMNs
+"#,
         _ => r#"  ___
          _nnnn_        
         dGGGGMMb       
@@ -847,6 +893,7 @@ pub fn get_logo_color(name: &str) -> (u8, u8, u8) {
         "alpine" => (13,89,127),
         "zerene" => (118, 75, 235),
         "netbsd" => (245, 152, 66),
+        "android" => (163, 197, 78),
         _ => (255, 255, 255), 
     }
 }
@@ -857,17 +904,17 @@ pub fn known_distros() -> Vec<&'static str> {
         "fedora", "rhel", "centos", "rocky", "almalinux",
         "opensuse-tumbleweed", "opensuse-leap", "sles",
         "gentoo", "void", "nixos", "pop", "elementary", "mageia",
-        "openmandriva", "lfs", "bedrock", "rfetch", "cachyos", "mist", "chimera", "zerene", "alpine"
+        "openmandriva", "lfs", "bedrock", "rfetch", "cachyos", "mist", "chimera", "zerene", "alpine",
+        "android",
     ]
 }
 
-pub fn cpu() -> String {
-    let sys = System::new_all();
-    let mut ret = String::from("");
+pub fn cpu(sys: &System) -> String {
     if let Some(first_cpu) = sys.cpus().first() {
-        ret = first_cpu.brand().to_string();
+        first_cpu.brand().to_string()
+    } else {
+        String::new()
     }
-    ret
 }
 
 pub fn raw_os_id_or_name() -> String {
@@ -880,31 +927,17 @@ pub fn os() -> String {
     format(&v).to_string()
 }
 
-pub fn ramuse() -> String {
-    let sys = System::new_all();
-    let mut used = sys.used_memory() as f32;
-    used = used / 1024.0 / 1024.0 / 1024.0;
-    used = (used * 10.0).ceil() / 10.0;
-    used.to_string()
-}
-
-pub fn ramtotal() -> String {
-    let sys = System::new_all();
-    let mut total = sys.total_memory() as f32;
-    total = total / 1024.0 / 1024.0 / 1024.0;
-    total = (total * 10.0).ceil() / 10.0;
-    total.to_string()
-}
-
-pub fn rampercent() -> String {
-    let used_gb: f32 = ramuse().parse().unwrap_or(0.0);
-    let total_gb: f32 = ramtotal().parse().unwrap_or(0.0);
-
-    if total_gb <= 0.0 {
-        return "0".to_string();
-    }
-
-    ((used_gb / total_gb) * 100.0).round().to_string()
+pub fn ram_info(sys: &System) -> (String, String, String) {
+    let used_bytes = sys.used_memory();
+    let total_bytes = sys.total_memory();
+    let used_gb = ((used_bytes as f32 / 1024.0 / 1024.0 / 1024.0) * 10.0).ceil() / 10.0;
+    let total_gb = ((total_bytes as f32 / 1024.0 / 1024.0 / 1024.0) * 10.0).ceil() / 10.0;
+    let pct = if total_gb > 0.0 {
+        ((used_gb / total_gb) * 100.0).round() as u32
+    } else {
+        0
+    };
+    (used_gb.to_string(), total_gb.to_string(), pct.to_string())
 }
 
 pub struct DiskInfo {
@@ -1060,33 +1093,41 @@ pub fn disks_info() -> Vec<DiskInfo> {
 
 pub fn wmde() -> String {
 	let unp_de = env::var("XDG_CURRENT_DESKTOP").unwrap_or_else(|_| "rfetch".to_string());
-	let p_de = match unp_de.to_lowercase().as_str() {
-		"gnome" => s(" gnome"),
-		"kde" | "plasma" => s(" kde"),
-		"niri" => s(" niri"),
-		"hyprland" => s(" hypr"),
-		"xfce" => s(" xfce"),
-		"sway" => s(" sway"),
-		"i3" => s(" i3"),
-		"mango" | "mangowm" => s("󱁆 mango"),
-		"cinnamon" | "x-cinnamon" => s(" cinnamon"),
-		_ => format!(" {}", unp_de.to_lowercase())
-	};
-	return p_de;
+	match unp_de.to_lowercase().as_str() {
+		"gnome" => String::from(" gnome"),
+		"kde" | "plasma" => String::from(" kde"),
+		"niri" => String::from(" niri"),
+		"hyprland" => String::from(" hypr"),
+		"xfce" => String::from(" xfce"),
+		"sway" => String::from(" sway"),
+		"i3" => String::from(" i3"),
+		"mango" | "mangowm" => String::from("󱁆 mango"),
+		"cinnamon" | "x-cinnamon" => String::from(" cinnamon"),
+		_ => format!(" {}", unp_de.to_lowercase())
+	}
 }
 pub fn kernel() -> String {
-    let output = Command::new("uname").arg("-sr").output().expect("");
-    let ret = String::from_utf8_lossy(&output.stdout).into_owned();
-    ret.trim().to_string()
+    if is_termux() {
+        if let Ok(ver) = std::fs::read_to_string("/proc/version") {
+            let version = ver.split_whitespace().nth(2).unwrap_or("unknown");
+            return format!("Linux {}", version);
+        }
+    }
+    std::fs::read_to_string("/proc/sys/kernel/osrelease")
+        .map(|s| format!("Linux {}", s.trim()))
+        .unwrap_or_else(|_| {
+            let output = Command::new("uname").arg("-sr").output().expect("");
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        })
 }
 pub fn shell() -> String {
-	let mut sh_unp = String::from("");
+    let mut sh_unp = String::from("");
     if let Ok(shell_path) = std::env::var("SHELL") {
         if let Some(name) = Path::new(&shell_path).file_name() {
             sh_unp = name.to_string_lossy().to_string();
         }
     };
-    
+
     if let Ok(passwd) = std::fs::read_to_string("/etc/passwd") {
         let username = std::env::var("USER").unwrap_or_default();
         for line in passwd.lines() {
@@ -1100,55 +1141,61 @@ pub fn shell() -> String {
             }
         }
     };
-    if sh_unp.trim() == String::from("") {
-    	sh_unp = s("unknown");
+    if sh_unp.trim().is_empty() {
+        sh_unp = String::from("unknown");
     };
-    let sh_p = match sh_unp.as_str() {
-    	"fish" => "󰈺 fish",
-    	"bash" => " bash",
-    	"zsh" => "󰰶 zsh",
-    	"sh" => " sh",
-    	_ => " unknown"	
-    };
-    sh_p.to_string()
+    match sh_unp.as_str() {
+        "fish" => "\u{f021a} fish".to_string(),
+        "bash" => "\u{e795} bash".to_string(),
+        "zsh" => "\u{f0c36} zsh".to_string(),
+        "sh" => "\u{f1211} sh".to_string(),
+        _ => "\u{f07b2} unknown".to_string()
+    }
 }
+
 pub fn terminal() -> String {
-	let mut unp_t: String = s("");
+    let mut unp_t = String::new();
     if let Some(term_program) = std::env::var("TERM_PROGRAM")
         .ok()
         .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty()) 
+        .filter(|s| !s.is_empty())
     {
-        unp_t = Some(term_program).unwrap().to_string();
+        unp_t = term_program;
     }
 
     if let Some(term) = std::env::var("TERM")
         .ok()
         .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty()) 
+        .filter(|s| !s.is_empty())
     {
-        unp_t = Some(term).unwrap().to_string();
+        unp_t = term;
     }
-	if unp_t != s("") {
-		return match unp_t.to_lowercase().as_str() {
-			"alacritty" => s("󰬈 alacritty"),
-			"xterm-kitty" => s(" kitty"),
-			"tabby" => s(" tabby.sh"),
-			"foot" => s("󰽒 foot"),
-			"xterm-256color" => s(" de terminal"),
-			_ => format!(" {}", unp_t.to_lowercase())
-		}
-	}
+    if !unp_t.is_empty() {
+        return match unp_t.to_lowercase().as_str() {
+            "alacritty" => "\u{f02d8} alacritty".to_string(),
+            "xterm-kitty" => "\u{eb99} kitty".to_string(),
+            "tabby" => "\u{f021b} tabby.sh".to_string(),
+            "foot" => "\u{f025c} foot".to_string(),
+            "xterm-256color" => "\u{f1219} de terminal".to_string(),
+            _ => format!("\u{e795} {}", unp_t.to_lowercase())
+        }
+    }
 
-    s("")
-}
-
-fn s(a: &str) -> String {
-	return String::from(a);
+    String::new()
 }
 pub fn gpu() -> String {
     if let Ok(gpu) = gfxinfo::active_gpu() {
         return gpu.model().to_string();
+    }
+
+    if is_termux() {
+        if let Ok(soc) = std::fs::read_to_string("/sys/devices/soc0/soc_id") {
+            let id = soc.trim().to_string();
+            return format!("SoC (id: {})", id);
+        }
+        if let Ok(hw) = std::fs::read_to_string("/sys/devices/soc0/machine") {
+            return hw.trim().to_string();
+        }
     }
 
     "none found, maybe integrated".to_string()
@@ -1157,18 +1204,48 @@ pub fn gpu() -> String {
 pub fn hostusr() -> String {
     format!(
         "{} ( {} )",
-        whoami::username().to_string(),
-        System::host_name().unwrap()
+        whoami::username(),
+        whoami::fallible::hostname().unwrap_or_default()
     )
 }
 
 pub fn uptime() -> String {
-    let output = Command::new("uptime").arg("-p").output().expect("");
-    let ret = String::from_utf8_lossy(&output.stdout).into_owned();
-    ret.trim().to_string().replace("up ", "")
+    std::fs::read_to_string("/proc/uptime")
+        .ok()
+        .and_then(|content| {
+            let secs: f64 = content.split_whitespace().next()?.parse().ok()?;
+            let total_secs = secs as u64;
+            let days = total_secs / 86400;
+            let hours = (total_secs % 86400) / 3600;
+            let mins = (total_secs % 3600) / 60;
+            let mut parts = Vec::new();
+            if days > 0 {
+                parts.push(format!("{} day{}", days, if days == 1 { "" } else { "s" }));
+            }
+            if hours > 0 {
+                parts.push(format!("{} hour{}", hours, if hours == 1 { "" } else { "s" }));
+            }
+            if mins > 0 || parts.is_empty() {
+                parts.push(format!("{} minute{}", mins, if mins == 1 { "" } else { "s" }));
+            }
+            Some(parts.join(", "))
+        })
+        .unwrap_or_else(|| {
+            let output = Command::new("uptime").arg("-p").output().expect("");
+            String::from_utf8_lossy(&output.stdout).trim().to_string().replace("up ", "")
+        })
 }
 
 pub fn get_battery_charge() -> usize {
+    if is_termux() {
+        if let Ok(cap) = std::fs::read_to_string("/sys/class/power_supply/battery/capacity") {
+            if let Ok(pct) = cap.trim().parse::<usize>() {
+                return pct;
+            }
+        }
+        return 500;
+    }
+
     let manager = match Manager::new() {
         Ok(m) => m,
         Err(_) => return 500,
