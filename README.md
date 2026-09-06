@@ -1,4 +1,7 @@
-<img width="889" height="389" alt="image" src="https://github.com/user-attachments/assets/56b4fa94-9902-4c06-82ee-fca7035f8492" />
+<figure>
+  <img width="722" height="272" alt="image" src="https://github.com/user-attachments/assets/4306121f-5f1f-4211-9c35-ba5a7d416480" />
+  <figcaption><i>custom rfetch configuration</i></figcaption>
+</figure>
 
 ## rfetch
 ### a tool for those wanting pretty screenshots and no config editing
@@ -32,3 +35,56 @@ sudo cp target/release/rfetch /usr/bin/rfetch
 
 ### running
 you should be able to launch rfetch from your terminal of choice just by typing `rfetch`
+
+### configuration
+unlike some.. particular fetches.. rfetch is meant to be screenshot-ready without configuration, or be very easy to configure
+when you first run rfetch, you'll be asked a question and a default configuration file will be created in ~/.config/rfetch/conf.jsonc
+it will most likely look like this:
+``` jsonc
+{
+        "show_beta": false,
+        "color_ascii": true,
+        "color_infotext": "white",
+        "hide_info": [
+                /*
+                uncomment any string below to hide the info about it.
+                beta features cannot be hidden unless you set show_beta to false
+                */
+                 // "headers"
+                 // "packages"
+                 // "os"
+                 // "kernel"
+                 // "uptime"
+                 // "cpu"
+                 // "gpu"
+                 // "ram"
+                 // "disk"
+                 // "battery" //(only hides it if it's present at all)
+        ],
+        "style": "sectioned" // options: sectioned/boxed
+}
+```
+if you came for a pretty config, here's your pretty config:
+```jsonc
+{
+        "show_beta": true,
+        "color_ascii": false,
+        "color_infotext": "white",
+        "hide_info": [
+                 "packages",
+                 "uptime",
+                 "battery"
+        ],
+        "style": "boxed"
+}
+```
+otherwise, here's a quick explanation of configuration options:
+1. `"show_beta"` - customize if you want to show beta features(DE/WM detection
+2. `"color_ascii"` - color the distro ascii art or no
+3. `"color_infotext"` - you can set a custom color for the info text! (examples: "blue", "cyan", "red")
+4. `"hide_info"` - select which sections of the info text to hide
+5. `"style"` - two styles are available: boxed(which you saw in the photo at the top of the readme) and sectioned(the old look rfetch had before 0.7). pick whichever you like most
+
+made with <3 by 🦀skerrixx and 🖥️francy
+
+
