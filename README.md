@@ -5,9 +5,8 @@
 rfetch is a tool similar to neofetch, fastfetch, screenfetch, etc. what it's built for is to provide essential system info with ascii art and a convenient beautiful format
 
 ## installation
-for those using arch linux based systems, they can download it through the arch user repository.
-however, the version there is currently outdated as the aur is blocking new pushes and updates.
-for those wanting a (recommended) manual install, the steps are:
+for those using arch linux based systems, they can download it through the arch user repository (paru -S rfetch / yay -S rfetch)
+for those wanting a manual install, the steps are:
 
 ### dependencies
 you need the basic commands for acquiring the repo. verify you have those installed using one of those commands:
