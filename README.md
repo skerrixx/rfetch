@@ -85,6 +85,6 @@ otherwise, here's a quick explanation of configuration options:
 4. `"hide_info"` - select which sections of the info text to hide
 5. `"style"` - two styles are available: boxed(which you saw in the photo at the top of the readme) and sectioned(the old look rfetch had before 0.7). pick whichever you like most
 
-made with <3 by 🦀skerrixx and 🖥️francy
+made with <3 by 🦀skerrixx and ⚡francy
 
 
