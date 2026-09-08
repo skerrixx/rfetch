@@ -11,14 +11,21 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
+
     - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install -y libdrm-dev libdrm-amdgpu-dev
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libdrm-dev pkg-config libpci-dev
+
+    - name: Rust Cache
+      uses: swatinem/rust-cache@v2
+
     - name: Build
       run: cargo build --verbose
+
     - name: Run tests
       run: cargo test --verbose
