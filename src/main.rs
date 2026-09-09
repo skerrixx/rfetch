@@ -71,7 +71,7 @@ fn random() {
 			println!("thank you for using rfetch!")
 		}
 		5 => {
-			let facts = ["i'm gay", "🦀", "one of its suggested original names is larpfetch", "i dont know how to make multicolored ascii, because i'm dumb"];            println!("fun fact about rfetch: {}", facts[rand::random_range(0..facts.len() as usize)]);
+			let facts = ["i'm gay", "🦀", "one of its suggested original names is larpfetch", "i dont know how to make multicolored ascii, because i'm dumb (francy here, maybe i will make it cuz skerrix cant)"];            println!("fun fact about rfetch: {}", facts[rand::random_range(0..facts.len() as usize)]);
 
 		}
 		6 => {
@@ -110,8 +110,8 @@ fn main() {
 				std::process::exit(0);
 			}
 			"--version" => {
-				println!("rfetch v0.7.5\nby skerrix and fxrncyy\nwritten using 🦀 v1.100\nthanks to:\n   1. flingo\n   2. those who installed it from the AUR\n   3. those who compiled it from source\n   4. you, for using rfetch!\n   {}", "francy is gay\n this code is licensed with GPLv3. microslop can suck our balls".black().italic());
-				std::process::exit(0)
+				println!("rfetch v0.7.5\nby skerrix and francy\nwritten using 🦀 v1.100\nthanks to:\n   1. flingo\n   2. those who installed it from the AUR\n   3. those who compiled it from source\n   4. you, for using rfetch!\n   {}", "francy is gay (im not, im bi but anyways)\n this code is licensed with GPLv3. microslop can suck our balls".black().italic());
+				std::process::exit(0) // idunno changed it cuz i am named in the whole code francy soo
 			}
 			_ => {
 				// just print the fetch if a flag is unknown (yeah skerrix youre very good at commenting(yes francy i am indeed awesome at commenting)) 
