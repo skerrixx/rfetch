@@ -1,12 +1,9 @@
 use serde::{Deserialize, Serialize};
-use std::io::{self, Write};
 use std::path::PathBuf;
 use colored::Colorize;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
-    #[serde(default = "defbeta")]
-    pub show_beta: bool,
     #[serde(default = "defacolor")]
     pub color_ascii: bool,
     #[serde(default = "deficolor")]
@@ -14,11 +11,11 @@ pub struct Config {
     #[serde(default = "defhide")]
     pub hide_info: Vec<String>,
 	#[serde(default = "defstyle")]
-	pub style: String
-}
-
-fn defbeta() -> bool {
-    false
+	pub style: String,
+	#[serde(default)]
+	pub anonymize: bool,
+	#[serde(default)]
+	pub ascii_path: Option<String>,
 }
 
 fn defacolor() -> bool {
@@ -40,11 +37,12 @@ fn defhide() -> Vec<String> {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            show_beta: defbeta(),
             color_ascii: defacolor(),
             color_infotext: deficolor(),
             hide_info: defhide(),
-			style: defstyle()
+			style: defstyle(),
+			anonymize: false,
+			ascii_path: None,
         }
     }
 }
@@ -115,11 +113,8 @@ fn strip_comments(input: &str) -> String {
     out
 }
 
-fn default_config_content(show_beta: bool) -> String {
-    format!(
-        "{{\n\t\"show_beta\": {},\n\t\"color_ascii\": true,\n\t\"color_infotext\": \"white\",\n\t\"hide_info\": [\n\t\t/* \n\t\tuncomment any string below to hide the info about it.\n\t\tbeta features cannot be hidden unless you set show_beta to false\n\t\t*/\n\t\t // \"headers\"\n\t\t // \"packages\"\n\t\t // \"os\"\n\t\t // \"kernel\"\n\t\t // \"uptime\"\n\t\t // \"cpu\"\n\t\t // \"gpu\"\n\t\t // \"ram\"\n\t\t // \"disk\"\n\t\t // \"battery\" //(only hides it if it's present at all)\n\t],\n\t\"style\": \"sectioned\" // options: sectioned/boxed\n}}\n",
-        show_beta
-    )
+fn default_config_content() -> String {
+    "{\n\t\"color_ascii\": true,\n\t\"color_infotext\": \"white\",\n\t\"hide_info\": [\n\t\t/* \n\t\tuncomment any string below to hide the info about it.\n\t\t*/\n\t\t // \"headers\"\n\t\t // \"packages\"\n\t\t // \"os\"\n\t\t // \"os_age\"\n\t\t // \"kernel\"\n\t\t // \"de/wm\" // (also: \"de_wm\", \"de\", \"wm\")\n\t\t // \"shell\"\n\t\t // \"terminal\" // (also: \"term\")\n\t\t // \"uptime\"\n\t\t // \"boot\"\n\t\t // \"cpu\"\n\t\t // \"gpu\"\n\t\t // \"ram\"\n\t\t // \"swap\"\n\t\t // \"load\" // (also: \"loadavg\", \"load_avg\")\n\t\t // \"processes\" // (also: \"procs\", \"proc\")\n\t\t // \"disk\"\n\t\t // \"battery\" //(only hides it if it's present at all)\n\t],\n\t\"style\": \"sectioned\", // options: sectioned/boxed\n\t\"anonymize\": false, // set true to hide username/hostname for screenshots\n\t\"ascii_path\": null // set to e.g. \"~/.config/rfetch/ascii.txt\" for custom art\n}\n".to_string()
 }
 pub fn load_config() -> Config {
     let path = config_path();
@@ -162,25 +157,9 @@ fn first_run_setup() -> Config {
         "\nwe haven't found a rfetch configuration file found at {}.",
         config_path().display()
     );
-    println!("\nlet's help you configure rfetch to your liking!");
-    println!(" ");
-    println!("there are some beta features that might bug out or break.");
-    println!("  - de/wm detection");
-    println!("  - shell detection");
-    println!("  - terminal detection");
-    println!();
-    print!("would you like to enable beta features? [y/n]: ");
-	let _ = io::stdout().flush();
-
-    let mut input = String::new();
-    let _ = io::stdin().read_line(&mut input);
-    let show_beta = matches!(input.trim().to_lowercase().as_str(), "y" | "yes");
-
-    println!("\ngreat! \n ! tip: set a custom color for the info output by editing ~/.config/rfetch/conf.jsonc\n");
-    let cfg = Config {
-        show_beta,
-        ..Config::default()
-    };
+    println!("\ncreating a default config - screenshot-ready, no setup needed!");
+    println!("tip: edit ~/.config/rfetch/conf.jsonc anytime to customize rfetch.\n");
+    let cfg = Config::default();
 
     if let Some(parent) = config_path().parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
@@ -195,7 +174,7 @@ fn first_run_setup() -> Config {
         }
     }
 
-    match std::fs::write(&config_path(), default_config_content(show_beta)) {
+    match std::fs::write(&config_path(), default_config_content()) {
         Ok(_) => {
             eprintln!();
             eprintln!("your config is created! it's located at {}.", config_path().display());

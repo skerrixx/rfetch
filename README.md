@@ -36,38 +36,57 @@ sudo cp target/release/rfetch /usr/bin/rfetch
 ### running
 you should be able to launch rfetch from your terminal of choice just by typing `rfetch`
 
+### cli flags
+```sh
+rfetch -d arch                  # override distro art
+rfetch --ascii ~/myart.txt      # custom ascii file (--ascii-path / --art work too)
+rfetch -a / --anonymize         # hide username/hostname for screenshots
+rfetch --json                   # machine-readable JSON (respects hide_info)
+rfetch -m / --minimal           # one-line compact output (skips gpu/disk/pkgs, fast)
+rfetch --no-art                 # info only, no art
+rfetch --logo-only              # art only, no info
+rfetch --clear-cache            # force rebuild of package cache
+```
+
 ### configuration
 unlike some.. particular fetches.. rfetch is meant to be screenshot-ready without configuration, or be very easy to configure
-when you first run rfetch, you'll be asked a question and a default configuration file will be created in ~/.config/rfetch/conf.jsonc
+when you first run rfetch, a default configuration file will be created in ~/.config/rfetch/conf.jsonc
 it will most likely look like this:
 ``` jsonc
 {
-        "show_beta": false,
         "color_ascii": true,
         "color_infotext": "white",
         "hide_info": [
                 /*
                 uncomment any string below to hide the info about it.
-                beta features cannot be hidden unless you set show_beta to false
                 */
                  // "headers"
                  // "packages"
                  // "os"
+                 // "os_age"
                  // "kernel"
+                 // "de/wm"
+                 // "shell"
+                 // "terminal"
                  // "uptime"
+                 // "boot"
                  // "cpu"
                  // "gpu"
                  // "ram"
+                 // "swap"
+                 // "load"
+                 // "processes"
                  // "disk"
                  // "battery" //(only hides it if it's present at all)
         ],
-        "style": "sectioned" // options: sectioned/boxed
+        "style": "sectioned", // options: sectioned/boxed
+        "anonymize": false, // set true to hide username/hostname for screenshots
+        "ascii_path": null // set to e.g. "~/.config/rfetch/ascii.txt" for custom art
 }
 ```
 if you came for a pretty config, here's your pretty config:
 ```jsonc
 {
-        "show_beta": true,
         "color_ascii": false,
         "color_infotext": "white",
         "hide_info": [
@@ -79,11 +98,12 @@ if you came for a pretty config, here's your pretty config:
 }
 ```
 otherwise, here's a quick explanation of configuration options:
-1. `"show_beta"` - customize if you want to show beta features(DE/WM detection
-2. `"color_ascii"` - color the distro ascii art or no
-3. `"color_infotext"` - you can set a custom color for the info text! (examples: "blue", "cyan", "red")
-4. `"hide_info"` - select which sections of the info text to hide
-5. `"style"` - two styles are available: boxed(which you saw in the photo at the top of the readme) and sectioned(the old look rfetch had before 0.7). pick whichever you like most
+1. `"color_ascii"` - color the distro ascii art or no
+2. `"color_infotext"` - you can set a custom color for the info text! (examples: "blue", "cyan", "red")
+3. `"hide_info"` - select which sections of the info text to hide
+4. `"style"` - two styles are available: boxed(which you saw in the photo at the top of the readme) and sectioned(the old look rfetch had before 0.7). pick whichever you like most
+5. `"anonymize"` - same as `-a/--anonymize`, hides username/hostname. good for screenshots
+6. `"ascii_path"` - path to a custom ascii art file (supports `~` and `$HOME`). CLI `--ascii` overrides this
 
 made with <3 by 🦀skerrixx and ⚡francy
 

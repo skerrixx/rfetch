@@ -15,6 +15,8 @@ struct PackageCache {
     suse: Option<usize>,
     netbsd: Option<usize>,
     termux: Option<usize>,
+    #[serde(default)]
+    gpu: Option<String>,
     timestamp: SystemTime,
 }
 
@@ -32,34 +34,78 @@ fn count_packages(cmd: &str, args: &[&str]) -> Option<usize> {
         })
 }
 
+fn binary_exists(cmd: &str) -> bool {
+    if cmd.contains('/') {
+        return std::fs::exists(cmd).unwrap_or(false);
+    }
+    let path = match std::env::var("PATH") {
+        Ok(p) if !p.trim().is_empty() => p,
+        _ => return true, // PATH unknown: fall back to trying the spawn (old behavior)
+    };
+    for dir in path.split(':') {
+        if dir.is_empty() {
+            continue;
+        }
+        if std::fs::exists(format!("{}/{}", dir, cmd)).unwrap_or(false) {
+            return true;
+        }
+    }
+    false
+}
+
+fn count_if_present(cmd: &str, args: &[&str]) -> Option<usize> {
+    // skip the fork/exec entirely for managers that aren't installed.
+    // output-identical: a missing binary fails the spawn and yields None anyway.
+    if !binary_exists(cmd) {
+        return None;
+    }
+    count_packages(cmd, args)
+}
+
 fn cache_path() -> String {
-    if let Ok(tmpdir) = std::env::var("TMPDIR") {
-        format!("{}/rfetch_packages.json", tmpdir)
-    } else {
-        "/tmp/rfetch_packages.json".to_string()
+    match std::env::var("TMPDIR") {
+        Ok(tmpdir) if !tmpdir.trim().is_empty() => format!("{}/rfetch_packages.json", tmpdir),
+        _ => "/tmp/rfetch_packages.json".to_string(),
     }
 }
 
+fn read_fresh_cache() -> Option<PackageCache> {
+    let data = std::fs::read_to_string(cache_path()).ok()?;
+    let cache: PackageCache = serde_json::from_str(&data).ok()?;
+    if cache.timestamp.elapsed().unwrap_or_default() < Duration::from_secs(3600) {
+        Some(cache)
+    } else {
+        None
+    }
+}
+
+pub fn cached_gpu() -> Option<String> {
+    read_fresh_cache()?.gpu
+}
+
 fn get_installed_packages_parallel() -> String {
-    let cp = cache_path();
-    if let Ok(data) = std::fs::read_to_string(&cp) {
-        if let Ok(cache) = serde_json::from_str::<PackageCache>(&data) {
-            if cache.timestamp.elapsed().unwrap_or_default() < Duration::from_secs(3600) {
-                return format_package_string(&cache);
-            }
-        }
+    if let Some(cache) = read_fresh_cache() {
+        return format_package_string(&cache);
     }
 
-    let debian = thread::spawn(|| count_packages("dpkg", &["--get-selections"]));
-    let arch = thread::spawn(|| count_packages("pacman", &["-Q"]));
-    let redhat = thread::spawn(|| count_packages("dnf", &["list", "--installed"]));
-    let alpine = thread::spawn(|| count_packages("apk", &["info"]));
-    let void = thread::spawn(|| count_packages("xbps-query", &["-l"]));
-    let flatpak = thread::spawn(|| count_packages("flatpak", &["list"]));
-    let gentoo = thread::spawn(|| count_packages("qlist", &["-Iv"]));
-    let suse = thread::spawn(|| count_packages("zypper", &["se", "-i"]));
-    let netbsd = thread::spawn(|| count_packages("pkg_info", &["-q"]));
-    let termux = thread::spawn(|| count_packages("dpkg-query", &["-f", "${Status}\n", "--show"]));
+    let debian = thread::spawn(|| count_if_present("dpkg", &["--get-selections"]));
+    let arch = thread::spawn(|| count_if_present("pacman", &["-Q"]));
+    let redhat = thread::spawn(|| count_if_present("dnf", &["list", "--installed"]));
+    let alpine = thread::spawn(|| count_if_present("apk", &["info"]));
+    let void = thread::spawn(|| count_if_present("xbps-query", &["-l"]));
+    let flatpak = thread::spawn(|| count_if_present("flatpak", &["list"]));
+    let gentoo = thread::spawn(|| count_if_present("qlist", &["-Iv"]));
+    let suse = thread::spawn(|| count_if_present("zypper", &["se", "-i"]));
+    let netbsd = thread::spawn(|| count_if_present("pkg_info", &["-q"]));
+    let termux = thread::spawn(|| count_if_present("dpkg-query", &["-f", "${Status}\n", "--show"]));
+    // gpu probing (~ms, DRM init) rides along in parallel so caching it costs no wall time.
+    // skipped when the caller already holds a fresh value via cached_gpu().
+    let gpu_probe = thread::spawn(|| {
+        if let Some(g) = read_fresh_cache().and_then(|c| c.gpu) {
+            return Some(g);
+        }
+        Some(crate::basic::gpu())
+    });
 
     let cache = PackageCache {
         debian: debian.join().unwrap_or(None),
@@ -72,10 +118,11 @@ fn get_installed_packages_parallel() -> String {
         suse: suse.join().unwrap_or(None),
         netbsd: netbsd.join().unwrap_or(None),
         termux: termux.join().unwrap_or(None),
+        gpu: gpu_probe.join().unwrap_or(None),
         timestamp: SystemTime::now(),
     };
 
-    let _ = std::fs::write(&cp, serde_json::to_string(&cache).unwrap());
+    let _ = std::fs::write(cache_path(), serde_json::to_string(&cache).unwrap());
 
     format_package_string(&cache)
 }
