@@ -3,9 +3,22 @@ use std::path::PathBuf;
 use colored::Colorize;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum AsciiColorMode {
+	Enabled(bool),
+	Color(String),
+}
+
+impl Default for AsciiColorMode {
+	fn default() -> Self {
+		AsciiColorMode::Enabled(true)
+	}
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     #[serde(default = "defacolor")]
-    pub color_ascii: bool,
+    pub color_ascii: AsciiColorMode,
     #[serde(default = "deficolor")]
     pub color_infotext: String,
     #[serde(default = "defhide")]
@@ -18,8 +31,8 @@ pub struct Config {
 	pub ascii_path: Option<String>,
 }
 
-fn defacolor() -> bool {
-    true
+fn defacolor() -> AsciiColorMode {
+    AsciiColorMode::Enabled(true)
 }
 
 fn deficolor() -> String {
@@ -114,7 +127,7 @@ fn strip_comments(input: &str) -> String {
 }
 
 fn default_config_content() -> String {
-    "{\n\t\"color_ascii\": true,\n\t\"color_infotext\": \"white\",\n\t\"hide_info\": [\n\t\t/* \n\t\tuncomment any string below to hide the info about it.\n\t\t*/\n\t\t // \"headers\"\n\t\t // \"packages\"\n\t\t // \"os\"\n\t\t // \"os_age\"\n\t\t // \"kernel\"\n\t\t // \"de/wm\" // (also: \"de_wm\", \"de\", \"wm\")\n\t\t // \"shell\"\n\t\t // \"terminal\" // (also: \"term\")\n\t\t // \"uptime\"\n\t\t // \"boot\"\n\t\t // \"cpu\"\n\t\t // \"gpu\"\n\t\t // \"ram\"\n\t\t // \"swap\"\n\t\t // \"load\" // (also: \"loadavg\", \"load_avg\")\n\t\t // \"processes\" // (also: \"procs\", \"proc\")\n\t\t // \"disk\"\n\t\t // \"battery\" //(only hides it if it's present at all)\n\t],\n\t\"style\": \"sectioned\", // options: sectioned/boxed\n\t\"anonymize\": false, // set true to hide username/hostname for screenshots\n\t\"ascii_path\": null // set to e.g. \"~/.config/rfetch/ascii.txt\" for custom art\n}\n".to_string()
+    "{\n\t\"color_ascii\": true, // options: true (distro color) / false (no color) / \"infotext\" (match color_infotext) / \"<color>\" (e.g. \"red\")\n\t\"color_infotext\": \"white\",\n\t\"hide_info\": [\n\t\t/* \n\t\tuncomment any string below to hide the info about it.\n\t\t*/\n\t\t // \"headers\"\n\t\t // \"packages\"\n\t\t // \"os\"\n\t\t // \"os_age\"\n\t\t // \"kernel\"\n\t\t // \"de/wm\" // (also: \"de_wm\", \"de\", \"wm\")\n\t\t // \"shell\"\n\t\t // \"terminal\" // (also: \"term\")\n\t\t // \"uptime\"\n\t\t // \"boot\"\n\t\t // \"cpu\"\n\t\t // \"gpu\"\n\t\t // \"ram\"\n\t\t // \"swap\"\n\t\t // \"load\" // (also: \"loadavg\", \"load_avg\")\n\t\t // \"processes\" // (also: \"procs\", \"proc\")\n\t\t // \"disk\"\n\t\t // \"battery\" //(only hides it if it's present at all)\n\t],\n\t\"style\": \"sectioned\", // options: sectioned/boxed\n\t\"anonymize\": false, // set true to hide username/hostname for screenshots\n\t\"ascii_path\": null // set to e.g. \"~/.config/rfetch/ascii.txt\" for custom art\n}\n".to_string()
 }
 pub fn load_config() -> Config {
     let path = config_path();

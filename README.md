@@ -58,7 +58,7 @@ when you first run rfetch, a default configuration file will be created in ~/.co
 it will most likely look like this:
 ``` jsonc
 {
-        "color_ascii": true,
+        "color_ascii": true, // options: true (distro color) / false (no color) / "infotext" (match color_infotext) / "<color>" (e.g. "red")
         "color_infotext": "white",
         "hide_info": [
                 /*
@@ -91,7 +91,7 @@ it will most likely look like this:
 if you came for a pretty config, here's your pretty config:
 ```jsonc
 {
-        "color_ascii": false,
+        "color_ascii": "infotext",
         "color_infotext": "white",
         "hide_info": [
                  "packages",
@@ -102,9 +102,9 @@ if you came for a pretty config, here's your pretty config:
 }
 ```
 otherwise, here's a quick explanation of configuration options:
-1. `"color_ascii"` - color the distro ascii art or no
-2. `"color_infotext"` - you can set a custom color for the info text! (examples: "blue", "cyan", "red")
-3. `"hide_info"` - select which sections of the info text to hide
+1. `"color_ascii"` - color the distro ascii art: `true` (distro color), `false` (no color), `"infotext"` (match `color_infotext`, icons included), or a color name (examples: "blue", "cyan", "red")
+2. `"color_infotext"` - you can set a custom color for the info text! (examples: "blue", "cyan", "red", "white", plus "bright_" variants like "bright_cyan")
+3. `"hide_info"` - select which sections of the info text to hide (valid values: "headers", "packages", "os", "os_age" (also "age"), "kernel", "de/wm", "shell", "terminal", "uptime", "boot", "cpu", "gpu", "ram", "swap", "load", "processes" (also "procs"), "disk", "battery")
 4. `"style"` - two styles are available: boxed(which you saw in the photo at the top of the readme) and sectioned(the old look rfetch had before 0.7). pick whichever you like most
 5. `"anonymize"` - same as `-a/--anonymize`, hides username/hostname. good for screenshots
 6. `"ascii_path"` - path to a custom ascii art file (supports `~` and `$HOME`). CLI `--ascii` overrides this

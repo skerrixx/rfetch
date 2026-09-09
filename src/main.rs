@@ -92,7 +92,37 @@ fn colorize_infotext(text: &str, color: &str) -> String {
 		"magenta" => text.magenta().to_string(),
 		"purple" => text.purple().to_string(),
 		"black" => text.black().to_string(),
+		"white" => text.white().to_string(),
+		"bright_black" | "bright-black" | "gray" | "grey" => text.bright_black().to_string(),
+		"bright_red" | "bright-red" => text.bright_red().to_string(),
+		"bright_green" | "bright-green" => text.bright_green().to_string(),
+		"bright_yellow" | "bright-yellow" => text.bright_yellow().to_string(),
+		"bright_blue" | "bright-blue" => text.bright_blue().to_string(),
+		"bright_magenta" | "bright-magenta" | "bright_purple" | "bright-purple" => text.bright_magenta().to_string(),
+		"bright_cyan" | "bright-cyan" => text.bright_cyan().to_string(),
+		"bright_white" | "bright-white" => text.bright_white().to_string(),
 		_ => text.to_string(),
+	}
+}
+
+fn colorize_ascii_line(line: &str, distro_key: &str, cfg: &config::Config) -> String {
+	// Logo coloring modes:
+	// - true  -> per-distro color (old behavior)
+	// - false -> no color
+	// - "infotext"/"match" -> same color as the info text (icons included)
+	// - "<color>" -> that named color (same names as color_infotext)
+	match &cfg.color_ascii {
+		config::AsciiColorMode::Enabled(false) => line.to_string(),
+		config::AsciiColorMode::Enabled(true) => {
+			let (r, g, b) = basic::get_logo_color(distro_key);
+			line.truecolor(r, g, b).to_string()
+		}
+		config::AsciiColorMode::Color(s)
+			if matches!(s.to_lowercase().as_str(), "infotext" | "match" | "auto") =>
+		{
+			colorize_infotext(line, &cfg.color_infotext)
+		}
+		config::AsciiColorMode::Color(s) => colorize_infotext(line, s),
 	}
 }
 
@@ -261,13 +291,8 @@ fn main() {
 	// --logo-only fast path: no info fetching at all
 	if logo_only {
 		let art_lines = load_art_lines(&distro_key, ascii_path_ref);
-		let (r, g, b) = basic::get_logo_color(&distro_key);
 		for line in &art_lines {
-			if cfg.color_ascii {
-				println!("{}", line.truecolor(r, g, b));
-			} else {
-				println!("{}", line);
-			}
+			println!("{}", colorize_ascii_line(line, &distro_key, &cfg));
 		}
 		std::process::exit(0);
 	}
@@ -512,14 +537,14 @@ fn main() {
 	let info_lines: Vec<String> = {
 
 		let mut v = Vec::new();
-		v.push(format!("  {}", host_display));
+		v.push(format!("  {}", colorize_infotext(&host_display, &cfg.color_infotext)));
 
 		if !hidden("headers") {
 			if cfg.style == "boxed" {	
-				v.push(format!("{}{}", "  ".blue(), "╭──────────╮"))
+				v.push(format!("  {}", colorize_infotext("╭──────────╮", &cfg.color_infotext)))
 			}
 			else {
-				v.push(format!("{}{}", "  ".blue(), "┏╸ software "))
+				v.push(format!("  {}", colorize_infotext("┏╸ software ", &cfg.color_infotext)))
 			}
 		}
 
@@ -611,10 +636,10 @@ fn main() {
 
 		if !hidden("headers") {
 		 	if cfg.style == "boxed" {	
-		 		v.push(format!("{}{}", "  ".blue(), "├──────────┤"))
+		 		v.push(format!("  {}", colorize_infotext("├──────────┤", &cfg.color_infotext)))
 		 	}
 		 	else {
-		 		v.push(format!("{}{}", "  ".blue(), "┏╸ hardware "))
+		 		v.push(format!("  {}", colorize_infotext("┏╸ hardware ", &cfg.color_infotext)))
 		 	}
 		}
 
@@ -696,17 +721,25 @@ fn main() {
 			}
 		}
 		if has_battery && !hidden("battery") {
-			if battery_charge <= 20 {
-				hardware.push(format!(" battery: {}% . charge, maybe?", battery_charge));
+			if cfg.style == "boxed" {
+				if battery_charge <= 20 {
+					hardware.push(format!("│  batt   │ {}% . charge, maybe?", battery_charge));
+				} else {
+					hardware.push(format!("│  batt   │ {}%", battery_charge));
+				}
 			} else {
-				hardware.push(format!(" battery: {}%", battery_charge));
+				if battery_charge <= 20 {
+					hardware.push(format!("┃  battery: {}% . charge, maybe?", battery_charge));
+				} else {
+					hardware.push(format!("┃  battery: {}%", battery_charge));
+				}
 			}
 		}
 
 		for (_i, line) in hardware.iter().enumerate() {
 			v.push(format!(
 				"{}{}",
-				"  ".cyan(),
+				"  ",
 				colorize_infotext(line, &cfg.color_infotext)
 			));
 		}
@@ -733,8 +766,6 @@ fn main() {
 	let left_width = art_width + padding;
 
 
-	let (r, g, b) = basic::get_logo_color(&distro_key);
-
 		let max_lines = art_lines.len().max(info_lines.len());
 		for i in 0..max_lines {
 			let left = art_lines.get(i).map(|s| s.as_str()).unwrap_or("");
@@ -744,11 +775,7 @@ fn main() {
 				if left.is_empty() {
 					println!();
 				} else {
-					if cfg.color_ascii {
-						println!("{}", left.truecolor(r, g, b));
-					} else {
-						println!("{}", left);
-					}
+					println!("{}", colorize_ascii_line(left, &distro_key, &cfg));
 				}
 			} else {
 				if left.is_empty() {
@@ -756,12 +783,8 @@ fn main() {
 				} else {
 					let visible_w = left.chars().count();
 					let pad = left_width.saturating_sub(visible_w);
-					if cfg.color_ascii {
-						let colored_left = left.truecolor(r, g, b);
-						println!("{colored_left}{:pad$} {right}", "");
-					} else {
-						println!("{left}{:pad$} {right}", "");
-					}
+					let colored_left = colorize_ascii_line(left, &distro_key, &cfg);
+					println!("{colored_left}{:pad$} {right}", "");
 				}
 			}
 		}
