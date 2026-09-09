@@ -3,6 +3,13 @@
   <figcaption><i>custom rfetch configuration</i></figcaption>
 </figure>
 
+<br>
+
+<figure>
+  <img width="757" height="272" alt="ss" src="https://github.com/user-attachments/assets/3b1136de-e4a1-43cd-8057-e22e8718cd28" />
+  <figcaption><i>custom rfetch config w/ anonymous flag and new infos</i></figcaption>
+</figure>
+
 ## rfetch
 ### a tool for those wanting pretty screenshots and no config editing
 rfetch is a tool similar to neofetch, fastfetch, screenfetch, etc. what it's built for is to provide essential system info with ascii art and a convenient beautiful format
