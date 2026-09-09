@@ -1,14 +1,11 @@
-<figure>
-  <img width="722" height="272" alt="image" src="https://github.com/user-attachments/assets/4306121f-5f1f-4211-9c35-ba5a7d416480" />
-  <figcaption><i>custom rfetch configuration</i></figcaption>
-</figure>
+<p align="center">
+  <img width="48%" src="https://github.com/user-attachments/assets/4306121f-5f1f-4211-9c35-ba5a7d416480" alt="Custom rfetch configuration" />
+  <img width="48%" src="https://github.com/user-attachments/assets/3b1136de-e4a1-43cd-8057-e22e8718cd28" alt="Custom rfetch configuration with anonymous flag and new infos" />
+</p>
 
-<br>
-
-<figure>
-  <img width="757" height="272" alt="ss" src="https://github.com/user-attachments/assets/3b1136de-e4a1-43cd-8057-e22e8718cd28" />
-  <figcaption><i>custom rfetch config w/ anonymous flag and new infos</i></figcaption>
-</figure>
+<p align="center">
+  <i>Custom rfetch configuration</i> &nbsp;&nbsp;•&nbsp;&nbsp; <i>Anonymous flag and new system information</i>
+</p>
 
 ## rfetch
 ### a tool for those wanting pretty screenshots and no config editing
