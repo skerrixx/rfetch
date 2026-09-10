@@ -3,6 +3,7 @@ mod basic;
 mod config;
 use pkgs::getform;
 use colored::Colorize;
+use std::collections::HashSet;
 use std::env;
 use whoami;
 use rand;
@@ -265,11 +266,12 @@ fn main() {
 	let ascii_path_opt: Option<String> = cli_ascii_path.or_else(|| cfg.ascii_path.clone());
 	let ascii_path_ref: Option<&str> = ascii_path_opt.as_deref();
 
-	let hidden = |key: &str| {
-		cfg.hide_info
-			.iter()
-			.any(|h| h.trim().to_lowercase() == key.to_lowercase())
-	};
+	// Normalized once up front: every `hidden()` check below is then an O(1)
+	// lookup. Previously each check re-scanned `hide_info` with two
+	// lowercase allocations per entry, so hiding more items made *every*
+	// check slower (O(checks x hidden)).
+	let hidden_set: HashSet<String> = cfg.hide_info.iter().map(|h| h.trim().to_lowercase()).collect();
+	let hidden = |key: &str| hidden_set.contains(key);
 	// os_age is shown unless *either* "os_age" or "age" is hidden.
 	let os_age_hidden = hidden("os_age") || hidden("age");
 	// promoted-to-stable (ex-beta): de/wm, shell, terminal are normal hideable rows now.
@@ -416,8 +418,10 @@ fn main() {
 		};
 		let h_gpu = if !hidden("gpu") {
 			Some(s.spawn(|| {
-				// gpu probing does DRM init (~18ms); reuse the 1h pkg-cache when fresh.
-				pkgs::cached_gpu().unwrap_or_else(basic::gpu)
+				// gpu probing does DRM init (~18ms); reuse the 1h gpu cache when fresh.
+				// the gpu cache is independent of the package cache, so hiding
+				// "packages" no longer starves this fast path (see pkgs::fetch_gpu).
+				pkgs::fetch_gpu()
 			}))
 		} else {
 			None
@@ -427,7 +431,14 @@ fn main() {
 		} else {
 			None
 		};
-		let h_battery = s.spawn(|| basic::get_battery_charge());
+		// battery probing (manager/dbus init) is skipped entirely when hidden;
+		// previously it ran on every invocation even with "battery" in hide_info,
+		// so hiding it saved zero time.
+		let h_battery = if !hidden("battery") {
+			Some(s.spawn(|| basic::get_battery_charge()))
+		} else {
+			None
+		};
 
 		if let Some(h) = h_kernel {
 			kernel_val = h.join().unwrap_or_default();
@@ -447,15 +458,16 @@ fn main() {
 		if let Some(h) = h_disks {
 			disk_infos = h.join().unwrap_or_default();
 		}
-		battery_charge = h_battery.join().unwrap_or(500);
+		battery_charge = h_battery.map(|h| h.join().unwrap_or(500)).unwrap_or(500);
 	});
 
 	let packages_val: Option<String> = if !hidden("packages") { Some(getform()) } else { None };
+	// no `System` is constructed at all when cpu/ram/swap are all hidden.
 	let need_sys = !hidden("cpu") || !hidden("ram") || !swap_hidden;
-	let sys = if need_sys { fresh_system() } else { System::new() };
-	let cpu_val: String = if !hidden("cpu") { basic::cpu(&sys) } else { String::new() };
-	let ram_vals: Option<(String, String, String)> = if !hidden("ram") { Some(basic::ram_info(&sys)) } else { None };
-	let swap_vals: Option<(String, String, String)> = if !swap_hidden { Some(basic::swap_info(&sys)) } else { None };
+	let sys = if need_sys { Some(fresh_system()) } else { None };
+	let cpu_val: String = if !hidden("cpu") { sys.as_ref().map(|s| basic::cpu(s)).unwrap_or_default() } else { String::new() };
+	let ram_vals: Option<(String, String, String)> = if !hidden("ram") { sys.as_ref().map(|s| basic::ram_info(s)) } else { None };
+	let swap_vals: Option<(String, String, String)> = if !swap_hidden { sys.as_ref().map(|s| basic::swap_info(s)) } else { None };
 	let load_val: String = if !load_hidden { basic::load_avg() } else { String::new() };
 	let procs_val: Option<usize> = if !procs_hidden { basic::process_count() } else { None };
 	let wmde_val: String = if !dewm_hidden { basic::wmde() } else { String::new() };

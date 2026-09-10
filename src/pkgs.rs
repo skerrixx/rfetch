@@ -15,8 +15,12 @@ struct PackageCache {
     suse: Option<usize>,
     netbsd: Option<usize>,
     termux: Option<usize>,
-    #[serde(default)]
-    gpu: Option<String>,
+    timestamp: SystemTime,
+}
+
+#[derive(Serialize, Deserialize)]
+struct GpuCache {
+    gpu: String,
     timestamp: SystemTime,
 }
 
@@ -79,8 +83,35 @@ fn read_fresh_cache() -> Option<PackageCache> {
     }
 }
 
+fn gpu_cache_path() -> String {
+    match std::env::var("TMPDIR") {
+        Ok(tmpdir) if !tmpdir.trim().is_empty() => format!("{}/rfetch_gpu.json", tmpdir),
+        _ => "/tmp/rfetch_gpu.json".to_string(),
+    }
+}
+
 pub fn cached_gpu() -> Option<String> {
-    read_fresh_cache()?.gpu
+    // GPU string lives in its own cache file so it stays warm even when
+    // "packages" is hidden. Previously both shared one file written only by
+    // getform(), so hiding packages starved this fast path: cached_gpu()
+    // missed forever and every run paid a full DRM probe (~20ms).
+    let data = std::fs::read_to_string(gpu_cache_path()).ok()?;
+    let cache: GpuCache = serde_json::from_str(&data).ok()?;
+    if cache.timestamp.elapsed().unwrap_or_default() < Duration::from_secs(3600) {
+        Some(cache.gpu)
+    } else {
+        None
+    }
+}
+
+pub fn fetch_gpu() -> String {
+    if let Some(g) = cached_gpu() {
+        return g;
+    }
+    let g = crate::basic::gpu();
+    let cache = GpuCache { gpu: g.clone(), timestamp: SystemTime::now() };
+    let _ = std::fs::write(gpu_cache_path(), serde_json::to_string(&cache).unwrap());
+    g
 }
 
 fn get_installed_packages_parallel() -> String {
@@ -98,14 +129,6 @@ fn get_installed_packages_parallel() -> String {
     let suse = thread::spawn(|| count_if_present("zypper", &["se", "-i"]));
     let netbsd = thread::spawn(|| count_if_present("pkg_info", &["-q"]));
     let termux = thread::spawn(|| count_if_present("dpkg-query", &["-f", "${Status}\n", "--show"]));
-    // gpu probing (~ms, DRM init) rides along in parallel so caching it costs no wall time.
-    // skipped when the caller already holds a fresh value via cached_gpu().
-    let gpu_probe = thread::spawn(|| {
-        if let Some(g) = read_fresh_cache().and_then(|c| c.gpu) {
-            return Some(g);
-        }
-        Some(crate::basic::gpu())
-    });
 
     let cache = PackageCache {
         debian: debian.join().unwrap_or(None),
@@ -118,7 +141,6 @@ fn get_installed_packages_parallel() -> String {
         suse: suse.join().unwrap_or(None),
         netbsd: netbsd.join().unwrap_or(None),
         termux: termux.join().unwrap_or(None),
-        gpu: gpu_probe.join().unwrap_or(None),
         timestamp: SystemTime::now(),
     };
 
@@ -167,6 +189,7 @@ fn format_package_string(cache: &PackageCache) -> String {
 
 pub fn clear_cache() {
     let _ = std::fs::remove_file(cache_path());
+    let _ = std::fs::remove_file(gpu_cache_path());
 }
 
 pub fn getform() -> String {
