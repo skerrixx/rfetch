@@ -11,7 +11,6 @@ use std::thread;
 use std::time::Duration;
 use std::io::{self, Write};
 use std::process::Command;
-use sysinfo::{CpuRefreshKind, System};
 
 fn print_usage() {
 	eprintln!("Usage: rfetch [options]");
@@ -73,14 +72,10 @@ fn display_hostusr(anonymize: bool) -> String {
 	}
 }
 
-/// Targeted sysinfo refresh: we only need RAM/SWAP usage + the CPU brand.
-/// `System::new_all()` also scans every process (~50ms for ~300 procs);
-/// this is ~20x cheaper and output-identical for what rfetch displays.
-fn fresh_system() -> System {
-	let mut sys = System::new();
-	sys.refresh_memory();
-	sys.refresh_cpu_list(CpuRefreshKind::nothing());
-	sys
+/// Cheap targeted system info: only the CPU brand and RAM/SWAP numbers rfetch
+/// displays, parsed straight from /proc (see `basic::SystemInfo`).
+fn fresh_system() -> basic::SystemInfo {
+	basic::SystemInfo::new()
 }
 
 fn colorize_infotext(text: &str, color: &str) -> String {
@@ -301,15 +296,38 @@ fn main() {
 
 	// --minimal fast path: skip heavy collectors (pkgs, gpu, disks, battery)
 	if minimal_output {
-		let kernel_val = if !hidden("kernel") { basic::kernel() } else { String::new() };
-		let uptime_val = if !hidden("uptime") { basic::uptime() } else { String::new() };
-		let os_age_val = if !os_age_hidden { basic::os_age() } else { String::new() };
-		let boot_val = if !boot_hidden { basic::boot_time() } else { String::new() };
-		let load_val = if !load_hidden { basic::load_avg() } else { String::new() };
-		let procs_val = if !procs_hidden { basic::process_count() } else { None };
-		let need_sys = !hidden("cpu") || !hidden("ram") || !swap_hidden;
-		let sys = if need_sys { Some(fresh_system()) } else { None };
-		let cpu_val = if !hidden("cpu") {
+		let cpu_shown = !hidden("cpu");
+		let ram_shown = !hidden("ram");
+		let swap_shown = !swap_hidden;
+		let need_sys = cpu_shown || ram_shown || swap_shown;
+
+		let mut kernel_val = String::new();
+		let mut uptime_val = String::new();
+		let mut os_age_val = String::new();
+		let mut boot_val = String::new();
+		let mut load_val = String::new();
+		let mut procs_val: Option<usize> = None;
+		let mut sys: Option<basic::SystemInfo> = None;
+
+		thread::scope(|s| {
+			let h_kernel = if !hidden("kernel") { Some(s.spawn(|| basic::kernel())) } else { None };
+			let h_uptime = if !hidden("uptime") { Some(s.spawn(|| basic::uptime())) } else { None };
+			let h_age = if !os_age_hidden { Some(s.spawn(|| basic::os_age())) } else { None };
+			let h_boot = if !boot_hidden { Some(s.spawn(|| basic::boot_time())) } else { None };
+			let h_load = if !load_hidden { Some(s.spawn(|| basic::load_avg())) } else { None };
+			let h_procs = if !procs_hidden { Some(s.spawn(|| basic::process_count())) } else { None };
+			let h_sys = if need_sys { Some(s.spawn(|| fresh_system())) } else { None };
+
+			if let Some(h) = h_kernel { kernel_val = h.join().unwrap_or_default(); }
+			if let Some(h) = h_uptime { uptime_val = h.join().unwrap_or_default(); }
+			if let Some(h) = h_age { os_age_val = h.join().unwrap_or_default(); }
+			if let Some(h) = h_boot { boot_val = h.join().unwrap_or_default(); }
+			if let Some(h) = h_load { load_val = h.join().unwrap_or_default(); }
+			if let Some(h) = h_procs { procs_val = h.join().unwrap_or_default(); }
+			if let Some(h) = h_sys { sys = h.join().ok(); }
+		});
+
+		let cpu_val = if cpu_shown {
 			sys.as_ref().map(|s| basic::cpu(s)).unwrap_or_default()
 		} else {
 			String::new()
@@ -394,6 +412,24 @@ fn main() {
 	let mut gpu_val = String::new();
 	let mut disk_infos = Vec::new();
 	let mut battery_charge: usize = 500;
+	let mut packages_val: Option<String> = None;
+	let mut cpu_val = String::new();
+	let mut ram_vals: Option<(String, String, String)> = None;
+	let mut swap_vals: Option<(String, String, String)> = None;
+	let mut load_val = String::new();
+	let mut procs_val: Option<usize> = None;
+	let mut wmde_val = String::new();
+	let mut shell_val = String::new();
+	let mut term_val = String::new();
+
+	// These collectors used to run serially *after* the scope, making their
+	// cost additive on top of the slow parallel probes (boot/disk/battery).
+	// Folding them into the same scope overlaps them with those probes.
+	let packages_shown = !hidden("packages");
+	let cpu_shown = !hidden("cpu");
+	let ram_shown = !hidden("ram");
+	let swap_shown = !swap_hidden;
+	let need_sys = cpu_shown || ram_shown || swap_shown;
 
 	thread::scope(|s| {
 		let h_kernel = if !hidden("kernel") {
@@ -440,6 +476,22 @@ fn main() {
 			None
 		};
 
+		let h_packages = if packages_shown { Some(s.spawn(|| getform())) } else { None };
+		let h_sys = if need_sys {
+			Some(s.spawn(move || {
+				let sys = fresh_system();
+				let cpu_val = if cpu_shown { basic::cpu(&sys) } else { String::new() };
+				let ram = if ram_shown { Some(basic::ram_info(&sys)) } else { None };
+				let swap = if swap_shown { Some(basic::swap_info(&sys)) } else { None };
+				(cpu_val, ram, swap)
+			}))
+		} else { None };
+		let h_load = if !load_hidden { Some(s.spawn(|| basic::load_avg())) } else { None };
+		let h_procs = if !procs_hidden { Some(s.spawn(|| basic::process_count())) } else { None };
+		let h_wmde = if !dewm_hidden { Some(s.spawn(|| basic::wmde())) } else { None };
+		let h_shell = if !shell_hidden { Some(s.spawn(|| basic::shell())) } else { None };
+		let h_term = if !term_hidden { Some(s.spawn(|| basic::terminal())) } else { None };
+
 		if let Some(h) = h_kernel {
 			kernel_val = h.join().unwrap_or_default();
 		}
@@ -459,20 +511,31 @@ fn main() {
 			disk_infos = h.join().unwrap_or_default();
 		}
 		battery_charge = h_battery.map(|h| h.join().unwrap_or(500)).unwrap_or(500);
+		if let Some(h) = h_packages {
+			packages_val = Some(h.join().unwrap_or_default());
+		}
+		if let Some(h) = h_sys {
+			let (c, r, sw) = h.join().unwrap_or_default();
+			cpu_val = c;
+			ram_vals = r;
+			swap_vals = sw;
+		}
+		if let Some(h) = h_load {
+			load_val = h.join().unwrap_or_default();
+		}
+		if let Some(h) = h_procs {
+			procs_val = h.join().unwrap_or_default();
+		}
+		if let Some(h) = h_wmde {
+			wmde_val = h.join().unwrap_or_default();
+		}
+		if let Some(h) = h_shell {
+			shell_val = h.join().unwrap_or_default();
+		}
+		if let Some(h) = h_term {
+			term_val = h.join().unwrap_or_default();
+		}
 	});
-
-	let packages_val: Option<String> = if !hidden("packages") { Some(getform()) } else { None };
-	// no `System` is constructed at all when cpu/ram/swap are all hidden.
-	let need_sys = !hidden("cpu") || !hidden("ram") || !swap_hidden;
-	let sys = if need_sys { Some(fresh_system()) } else { None };
-	let cpu_val: String = if !hidden("cpu") { sys.as_ref().map(|s| basic::cpu(s)).unwrap_or_default() } else { String::new() };
-	let ram_vals: Option<(String, String, String)> = if !hidden("ram") { sys.as_ref().map(|s| basic::ram_info(s)) } else { None };
-	let swap_vals: Option<(String, String, String)> = if !swap_hidden { sys.as_ref().map(|s| basic::swap_info(s)) } else { None };
-	let load_val: String = if !load_hidden { basic::load_avg() } else { String::new() };
-	let procs_val: Option<usize> = if !procs_hidden { basic::process_count() } else { None };
-	let wmde_val: String = if !dewm_hidden { basic::wmde() } else { String::new() };
-	let shell_val: String = if !shell_hidden { basic::shell() } else { String::new() };
-	let term_val: String = if !term_hidden { basic::terminal() } else { String::new() };
 
 	if json_output {
 		let user_name = if anonymize { "anonymous".to_string() } else { whoami::username() };
