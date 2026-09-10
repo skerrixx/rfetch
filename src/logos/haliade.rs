@@ -1,9 +1,9 @@
 use super::Logo;
 
 pub const LOGO: Logo = Logo {
-    id: "zerene",
-    aliases: &[],
-    display_name: "  zereneos",
+    id: "haliade",
+    aliases: &["zerene"],
+    display_name: "  haliade",
     art: r#"
           ''
        .:kNK,

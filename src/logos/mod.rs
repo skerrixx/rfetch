@@ -21,6 +21,7 @@ pub mod endeavouros;
 pub mod fedora;
 pub mod garuda;
 pub mod gentoo;
+pub mod haliade;
 pub mod kali;
 pub mod kyon;
 pub mod lfs;
@@ -41,7 +42,6 @@ pub mod rocky;
 pub mod ubuntu;
 pub mod unknown;
 pub mod void;
-pub mod zerene;
 
 /// A single distro logo: identity, search aliases, display label, ASCII art
 /// and the accent color used when coloring the art.
@@ -94,7 +94,7 @@ pub static LOGOS: &[&Logo] = &[
     &elementary::LOGO,
     &chimera::LOGO,
     &alpine::LOGO,
-    &zerene::LOGO,
+    &haliade::LOGO,
     &netbsd::LOGO,
     &android::LOGO,
 ];
@@ -135,7 +135,7 @@ pub fn known_distros() -> Vec<&'static str> {
         "fedora", "rhel", "centos", "rocky", "almalinux",
         "opensuse-tumbleweed", "opensuse-leap", "sles",
         "gentoo", "void", "nixos", "pop", "elementary", "mageia",
-        "openmandriva", "lfs", "bedrock", "rfetch", "cachyos", "mist", "chimera", "zerene", "alpine",
+        "openmandriva", "lfs", "bedrock", "rfetch", "cachyos", "mist", "chimera", "haliade", "alpine",
         "android",
     ]
 }
@@ -212,5 +212,16 @@ mod tests {
         assert_eq!(lookup("archlinux").map(|logo| logo.id), Some("arch"));
         assert_eq!(lookup("nixos").map(|logo| logo.id), Some("nix"));
         assert!(lookup("").is_none());
+    }
+
+    #[test]
+    fn haliade_rename() {
+        assert_eq!(LOGOS.len(), 39);
+        assert_eq!(lookup("haliade").map(|logo| logo.id), Some("haliade"));
+        assert_eq!(lookup("zerene").map(|logo| logo.id), Some("haliade"));
+        assert!(known_distros().contains(&"haliade"));
+        assert!(!known_distros().contains(&"zerene"));
+        assert!(display_name_for("haliade").contains("haliade"));
+        assert!(display_name_for("haliade").contains('\u{efa7}'));
     }
 }
