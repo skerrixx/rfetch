@@ -3,7 +3,6 @@ use std::path::Path;
 use std::env;
 use std::collections::HashSet;
 use sysinfo::System;
-use gfxinfo;
 use whoami;
 use starship_battery::Manager;
 use starship_battery::units::ratio::percent;
@@ -1234,8 +1233,8 @@ pub fn terminal() -> String {
     String::new()
 }
 pub fn gpu() -> String {
-    if let Ok(gpu) = gfxinfo::active_gpu() {
-        return gpu.model().to_string();
+    if let Some(name) = gpu_from_sysfs() {
+        return name;
     }
 
     if is_termux() {
@@ -1249,6 +1248,95 @@ pub fn gpu() -> String {
     }
 
     "none found, maybe integrated".to_string()
+}
+
+fn read_hex(path: &str) -> Option<u32> {
+    let s = std::fs::read_to_string(path).ok()?;
+    let s = s.trim();
+    let s = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")).unwrap_or(s);
+    u32::from_str_radix(s, 16).ok()
+}
+
+// the marketing name comes from the same amdgpu.ids table libdrm used, keyed by
+// PCI (device, revision) id, so we get the exact same string without linking
+// libdrm (which every process otherwise had to load at startup).
+fn amdgpu_name(device_id: u32, revision_id: u32) -> Option<String> {
+    let ids = std::fs::read_to_string("/usr/share/libdrm/amdgpu.ids").ok()?;
+    for line in ids.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let mut fields = line.split(',');
+        let (did, rid) = match (fields.next(), fields.next()) {
+            (Some(d), Some(r)) => (d.trim(), r.trim()),
+            _ => continue,
+        };
+        let name = fields.collect::<Vec<_>>().join(",");
+        let name = name.trim();
+        if name.is_empty() {
+            continue;
+        }
+        if let (Ok(d), Ok(r)) = (u32::from_str_radix(did, 16), u32::from_str_radix(rid, 16)) {
+            if d == device_id && r == revision_id {
+                return Some(name.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn nvidia_name() -> Option<String> {
+    for e in std::fs::read_dir("/proc/driver/nvidia/gpus").ok()?.flatten() {
+        let info = match std::fs::read_to_string(e.path().join("information")) {
+            Ok(i) => i,
+            Err(_) => continue,
+        };
+        for line in info.lines() {
+            if let Some(rest) = line.strip_prefix("Model:") {
+                let name = rest.trim();
+                if !name.is_empty() {
+                    return Some(name.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+// mirrors gfxinfo's order (amd then nvidia) and the names it produced, but
+// straight from sysfs/proc so there is nothing to dlopen or ioctl.
+fn gpu_from_sysfs() -> Option<String> {
+    let mut amd = None;
+    let mut nvidia = None;
+    for e in std::fs::read_dir("/sys/class/drm").ok()?.flatten() {
+        let name = e.file_name();
+        let name = name.to_string_lossy();
+        let rest = match name.strip_prefix("card") {
+            Some(r) => r,
+            None => continue,
+        };
+        // only "cardN" nodes, skip connectors like card0-DP-1
+        if rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) {
+            continue;
+        }
+        let dev = format!("/sys/class/drm/{}/device", name);
+        match read_hex(&format!("{}/vendor", dev)) {
+            Some(0x1002) if amd.is_none() => {
+                if let (Some(did), Some(rid)) =
+                    (read_hex(&format!("{}/device", dev)), read_hex(&format!("{}/revision", dev)))
+                {
+                    // fall back to libdrm's default when the id table misses
+                    amd = amdgpu_name(did, rid).or_else(|| Some("AMD Radeon Graphics".to_string()));
+                }
+            }
+            Some(0x10de) if nvidia.is_none() => {
+                nvidia = nvidia_name();
+            }
+            _ => {}
+        }
+    }
+    amd.or(nvidia)
 }
 
 pub fn hostusr() -> String {
@@ -1576,17 +1664,10 @@ pub fn load_avg() -> String {
 }
 
 pub fn process_count() -> Option<usize> {
-    // counting /proc numeric dirs = processes (threads excluded, unlike loadavg total)
-    use std::os::unix::ffi::OsStrExt;
-    if let Ok(entries) = std::fs::read_dir("/proc") {
-        let mut n = 0usize;
-        for e in entries.flatten() {
-            let b = e.file_name();
-            let b = b.as_bytes();
-            if !b.is_empty() && b.iter().all(u8::is_ascii_digit) {
-                n += 1;
-            }
-        }
+    // counting /proc numeric dirs = processes (threads excluded, unlike loadavg total).
+    // getdents64 directly so we skip the OsString read_dir allocates per entry,
+    // which is one heap allocation for every pid on every run.
+    if let Some(n) = count_proc_pids() {
         if n > 0 {
             return Some(n);
         }
@@ -1601,6 +1682,60 @@ pub fn process_count() -> Option<usize> {
         }
     }
     None
+}
+
+fn count_proc_pids() -> Option<usize> {
+    use std::os::unix::io::AsRawFd;
+    let dir = std::fs::File::open("/proc").ok()?;
+    let fd = dir.as_raw_fd();
+    let mut buf = [0u8; 16384];
+    let mut n = 0usize;
+    loop {
+        let nread = unsafe {
+            libc::syscall(
+                libc::SYS_getdents64,
+                fd,
+                buf.as_mut_ptr() as *mut libc::c_void,
+                buf.len(),
+            )
+        };
+        if nread <= 0 {
+            break;
+        }
+        let end = nread as usize;
+        let mut off = 0usize;
+        while off + 19 <= end {
+            let d = unsafe { &*(buf.as_ptr().add(off) as *const libc::dirent64) };
+            let reclen = d.d_reclen as usize;
+            if reclen == 0 || off + reclen > end {
+                break;
+            }
+            let name = d.d_name.as_ptr() as *const u8;
+            let mut is_pid = false;
+            let mut i = 0usize;
+            loop {
+                let c = unsafe { *name.add(i) };
+                if c == 0 {
+                    break;
+                }
+                if !c.is_ascii_digit() {
+                    is_pid = false;
+                    break;
+                }
+                is_pid = true;
+                i += 1;
+                if i >= 256 {
+                    is_pid = false;
+                    break;
+                }
+            }
+            if is_pid {
+                n += 1;
+            }
+            off += reclen;
+        }
+    }
+    Some(n)
 }
 
 fn read_btime() -> Option<u64> {

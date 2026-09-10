@@ -12,7 +12,6 @@ strip = true
 
 [dependencies]
 sysinfo = "0.33"
-gfxinfo = "0.1"
 whoami = "1.5"
 starship-battery = "0.11"
 serde = { version = "1.0", features = ["derive"] }
