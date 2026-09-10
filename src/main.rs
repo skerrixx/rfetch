@@ -229,7 +229,7 @@ fn main() {
 				std::process::exit(0);
 			}
 			"--version" => {
-				println!("rfetch v1.0.0\nmade with   by  skerrix and  francy\nwritten using 🦀 v1.100\nthanks to:\n   1. flingo\n   2. tromtom\n   3. those who installed it from the AUR\n   4. those who compiled it from source\n   5. you, for using rfetch!\n   {}\n{}{}{}", "francy is tuff\n".italic().black(),"this code is licensed with ","GPL-3.0".yellow(),". microslop can suck our balls");
+				println!("rfetch v1.0.0\nmade with   by  skerrix and  francy\nwritten using 🦀 v1.100\nthanks to:\n   1. flingo\n   2. tromtom\n   3. those who installed it from the AUR\n   4. those who compiled it from source\n   5. you, for using rfetch!\n   {}\n{}{}{}", "francy is tuff\n".purple().italic(),"this code is licensed with ","GPL-3.0".yellow(),". microslop can suck our balls");
 				std::process::exit(0)
 			}
 			_ => {
