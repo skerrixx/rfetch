@@ -72,7 +72,7 @@ fn display_hostusr(anonymize: bool) -> String {
 	}
 }
 
-/// Cheap targeted system info: only the CPU brand and RAM/SWAP numbers rfetch
+/// cheap targeted system info: only the cpu brand and ram/swap numbers rfetch
 /// displays, parsed straight from /proc (see `basic::SystemInfo`).
 fn fresh_system() -> basic::SystemInfo {
 	basic::SystemInfo::new()
@@ -102,7 +102,7 @@ fn colorize_infotext(text: &str, color: &str) -> String {
 }
 
 fn colorize_ascii_line(line: &str, distro_key: &str, cfg: &config::Config) -> String {
-	// Logo coloring modes:
+	// logo coloring modes:
 	// - true  -> per-distro color (old behavior)
 	// - false -> no color
 	// - "infotext"/"match" -> same color as the info text (icons included)
@@ -261,8 +261,8 @@ fn main() {
 	let ascii_path_opt: Option<String> = cli_ascii_path.or_else(|| cfg.ascii_path.clone());
 	let ascii_path_ref: Option<&str> = ascii_path_opt.as_deref();
 
-	// Normalized once up front: every `hidden()` check below is then an O(1)
-	// lookup. Previously each check re-scanned `hide_info` with two
+	// normalized once up front: every `hidden()` check below is then an O(1)
+	// lookup. previously each check re-scanned `hide_info` with two
 	// lowercase allocations per entry, so hiding more items made *every*
 	// check slower (O(checks x hidden)).
 	let hidden_set: HashSet<String> = cfg.hide_info.iter().map(|h| h.trim().to_lowercase()).collect();
@@ -422,9 +422,9 @@ fn main() {
 	let mut shell_val = String::new();
 	let mut term_val = String::new();
 
-	// These collectors used to run serially *after* the scope, making their
+	// these collectors used to run serially *after* the scope, making their
 	// cost additive on top of the slow parallel probes (boot/disk/battery).
-	// Folding them into the same scope overlaps them with those probes.
+	// folding them into the same scope overlaps them with those probes.
 	let packages_shown = !hidden("packages");
 	let cpu_shown = !hidden("cpu");
 	let ram_shown = !hidden("ram");
@@ -454,7 +454,7 @@ fn main() {
 		};
 		let h_gpu = if !hidden("gpu") {
 			Some(s.spawn(|| {
-				// gpu probing does DRM init (~18ms); reuse the 1h gpu cache when fresh.
+				// gpu probing does drm init (~18ms); reuse the 1h gpu cache when fresh.
 				// the gpu cache is independent of the package cache, so hiding
 				// "packages" no longer starves this fast path (see pkgs::fetch_gpu).
 				pkgs::fetch_gpu()

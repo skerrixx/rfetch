@@ -91,10 +91,10 @@ fn gpu_cache_path() -> String {
 }
 
 pub fn cached_gpu() -> Option<String> {
-    // GPU string lives in its own cache file so it stays warm even when
-    // "packages" is hidden. Previously both shared one file written only by
+    // gpu string lives in its own cache file so it stays warm even when
+    // "packages" is hidden. previously both shared one file written only by
     // getform(), so hiding packages starved this fast path: cached_gpu()
-    // missed forever and every run paid a full DRM probe (~20ms).
+    // missed forever and every run paid a full drm probe (~20ms).
     let data = std::fs::read_to_string(gpu_cache_path()).ok()?;
     let cache: GpuCache = serde_json::from_str(&data).ok()?;
     if cache.timestamp.elapsed().unwrap_or_default() < Duration::from_secs(3600) {

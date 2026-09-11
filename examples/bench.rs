@@ -1,25 +1,25 @@
 //! rfetch benchmark harness.
 //!
-//! Spawns the release binary N times and reports wall-clock statistics
+//! spawns the release binary N times and reports wall-clock statistics
 //! (min / median / mean / p90 / p99 / max / stddev) in milliseconds.
 //!
-//! This replaces eyeballing `time rfetch`: `time` gives you one noisy sample
+//! this replaces eyeballing `time rfetch`: `time` gives you one noisy sample
 //! (including shell startup) while this runs a warmup, many iterations, and
 //! reports the distribution so you can tell signal from noise.
 //!
-//! Build + run:
+//! build + run:
 //!   cargo build --release
 //!   cargo run --release --example bench
 //!   cargo run --release --example bench -- --runs 200
 //!   cargo run --release --example bench -- --compare build/rfetch
 //!   cargo run --release --example bench -- -- --minimal
 //!
-//! Options:
+//! options:
 //!   --runs N          measured iterations per binary   (default 100)
 //!   --warmup N        discarded warmup iterations      (default 10)
 //!   --bin PATH        binary under test                (default target/release/rfetch)
 //!   --compare PATH    second binary; runs are interleaved A/B/A/B to cancel drift
-//!   --json            emit one JSON object per binary
+//!   --json            emit one json object per binary
 //!   --                everything after is passed to the binary
 
 use std::env;
@@ -197,13 +197,13 @@ fn main() {
     match compare {
         Some(bin_b) => {
             let label_b = bin_b.clone();
-            // Warm both binaries so page cache, branch predictors and CPU
+            // warm both binaries so page cache, branch predictors and cpu
             // frequency are hot for each regardless of who runs first.
             for _ in 0..warmup {
                 measure(&bin_a, &bin_args);
                 measure(&bin_b, &bin_args);
             }
-            // Randomize measurement order: a fixed A-then-B interleave is
+            // randomize measurement order: a fixed A-then-B interleave is
             // biased because B always inherits the pages A just warmed. A
             // randomized stream gives both binaries the same distribution of
             // cold-ish vs warm starts, which is what opt-level comparisons

@@ -82,11 +82,11 @@ fn os_id_or_name() -> String {
 }
 
 
-/// Hot-path replacement for `sysinfo::System`.
+/// hot-path replacement for `sysinfo::System`.
 ///
-/// Constructing and refreshing a `System` costs ~0.4ms because sysinfo keeps
-/// its own bookkeeping and parses far more of /proc than rfetch reads. We only
-/// need the CPU brand plus four memory numbers, so parse /proc directly. The
+/// constructing and refreshing a `System` costs ~0.4ms because sysinfo keeps
+/// its own bookkeeping and parses far more of /proc than rfetch reads. we only
+/// need the cpu brand plus four memory numbers, so parse /proc directly. the
 /// derived values are identical to sysinfo's (verified: total = MemTotal,
 /// used = MemTotal - MemAvailable, swap = SwapTotal - SwapFree).
 pub struct SystemInfo {
@@ -219,7 +219,7 @@ pub fn disks_info() -> Vec<DiskInfo> {
     let gb = 1024.0 * 1024.0 * 1024.0;
     let mut result = Vec::new();
 
-    // Read the mount table directly and statvfs each real device. This is what
+    // read the mount table directly and statvfs each real device. this is what
     // `df` does, minus the ~0.9ms process spawn, and yields the same numbers.
     if let Ok(mounts) = std::fs::read_to_string("/proc/mounts") {
         let mut seen = HashSet::new();
@@ -441,7 +441,7 @@ fn read_hex(path: &str) -> Option<u32> {
 }
 
 // the marketing name comes from the same amdgpu.ids table libdrm used, keyed by
-// PCI (device, revision) id, so we get the exact same string without linking
+// pci (device, revision) id, so we get the exact same string without linking
 // libdrm (which every process otherwise had to load at startup).
 fn amdgpu_name(device_id: u32, revision_id: u32) -> Option<String> {
     let ids = std::fs::read_to_string("/usr/share/libdrm/amdgpu.ids").ok()?;
@@ -557,7 +557,7 @@ pub fn uptime() -> String {
         })
 }
 
-/// Reads charge from sysfs directly. `starship_battery::Manager` costs ~0.9ms
+/// reads charge from sysfs directly. `starship_battery::Manager` costs ~0.9ms
 /// (walks the whole power_supply class, builds typed units) but ends up reading
 /// these same `capacity` nodes, so the value is identical.
 fn read_battery_percent() -> Option<usize> {
@@ -591,7 +591,7 @@ pub fn get_battery_charge() -> usize {
     }
 
     // sysfs exists on linux, so an empty scan means this machine genuinely has
-    // no battery. Bail instead of paying ~0.9ms for a manager walk.
+    // no battery. bail instead of paying ~0.9ms for a manager walk.
     if Path::new("/sys/class/power_supply").exists() {
         return 500;
     }
@@ -637,8 +637,8 @@ fn stat_birth_fallback(path: &str) -> Option<SystemTime> {
     UNIX_EPOCH.checked_add(std::time::Duration::from_secs(secs))
 }
 
-/// Try to parse the first timestamp in /var/log/pacman.log (arch btw).
-/// Lines look like: [2026-09-07T20:47:00+0200] [PACMAN] Running ...
+/// try to parse the first timestamp in /var/log/pacman.log (arch btw).
+/// lines look like: [2026-09-07T20:47:00+0200] [PACMAN] Running ...
 fn pacman_log_install_time() -> Option<SystemTime> {
     let content = std::fs::read_to_string("/var/log/pacman.log").ok()?;
     for line in content.lines() {
@@ -929,7 +929,7 @@ fn read_btime() -> Option<u64> {
         .and_then(|v| v.trim().parse().ok())
 }
 
-/// Formats an epoch timestamp in local time via `localtime_r` so we match what
+/// formats an epoch timestamp in local time via `localtime_r` so we match what
 /// `uptime -s` printed, without paying for a process spawn (~1ms).
 fn format_local(ts: u64) -> Option<String> {
     let t = ts as libc::time_t;
