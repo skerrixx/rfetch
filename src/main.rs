@@ -24,7 +24,7 @@ fn print_usage() {
 	eprintln!("  -m, --minimal           One-line compact output (fast, skips gpu/disk/pkgs)");
 	eprintln!("  --no-art                Show info only, no ascii art");
 	eprintln!("  --logo-only             Show ascii art only, no info");
-	eprintln!("  --clear-cache           Force rebuild of package/drives cache");
+	eprintln!("  --clear-cache           Force rebuild of package/gpu caches");
 	eprintln!("  -h, --help              Show this help");
 	eprintln!();
 	eprintln!("Available distros: {}", basic::known_distros().join(", "));
