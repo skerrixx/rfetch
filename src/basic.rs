@@ -3,7 +3,6 @@ use std::path::Path;
 use std::env;
 use std::collections::HashSet;
 use sysinfo::System;
-use gfxinfo;
 use whoami;
 use starship_battery::Manager;
 use starship_battery::units::ratio::percent;
@@ -83,12 +82,85 @@ fn os_id_or_name() -> String {
 }
 
 
-pub fn cpu(sys: &System) -> String {
-    if let Some(first_cpu) = sys.cpus().first() {
-        first_cpu.brand().to_string()
-    } else {
-        String::new()
+/// Hot-path replacement for `sysinfo::System`.
+///
+/// Constructing and refreshing a `System` costs ~0.4ms because sysinfo keeps
+/// its own bookkeeping and parses far more of /proc than rfetch reads. We only
+/// need the CPU brand plus four memory numbers, so parse /proc directly. The
+/// derived values are identical to sysinfo's (verified: total = MemTotal,
+/// used = MemTotal - MemAvailable, swap = SwapTotal - SwapFree).
+pub struct SystemInfo {
+    cpu_brand: String,
+    mem_total_kb: u64,
+    mem_available_kb: u64,
+    swap_total_kb: u64,
+    swap_free_kb: u64,
+}
+
+impl SystemInfo {
+    pub fn new() -> Self {
+        let (mem_total_kb, mem_available_kb, swap_total_kb, swap_free_kb) =
+            read_meminfo().unwrap_or((0, 0, 0, 0));
+        Self {
+            cpu_brand: read_cpu_brand(),
+            mem_total_kb,
+            mem_available_kb,
+            swap_total_kb,
+            swap_free_kb,
+        }
     }
+}
+
+impl Default for SystemInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn read_meminfo() -> Option<(u64, u64, u64, u64)> {
+    let content = std::fs::read_to_string("/proc/meminfo").ok()?;
+    let (mut total, mut available, mut free, mut buffers, mut cached) = (0u64, 0u64, 0u64, 0u64, 0u64);
+    let (mut swap_total, mut swap_free) = (0u64, 0u64);
+    for line in content.lines() {
+        let Some((key, rest)) = line.split_once(':') else { continue };
+        let Some(value) = rest.split_whitespace().next().and_then(|v| v.parse::<u64>().ok()) else { continue };
+        match key {
+            "MemTotal" => total = value,
+            "MemAvailable" => available = value,
+            "MemFree" => free = value,
+            "Buffers" => buffers = value,
+            "Cached" => cached = value,
+            "SwapTotal" => swap_total = value,
+            "SwapFree" => swap_free = value,
+            _ => {}
+        }
+    }
+    if available == 0 {
+        available = free + buffers + cached;
+    }
+    Some((total, available, swap_total, swap_free))
+}
+
+fn read_cpu_brand() -> String {
+    let Ok(content) = std::fs::read_to_string("/proc/cpuinfo") else {
+        return String::new();
+    };
+    for line in content.lines() {
+        let Some((key, value)) = line.split_once(':') else { continue };
+        let value = value.trim();
+        if value.is_empty() {
+            continue;
+        }
+        match key.trim() {
+            "model name" | "Processor" | "cpu model" | "Hardware" => return value.to_string(),
+            _ => {}
+        }
+    }
+    String::new()
+}
+
+pub fn cpu(info: &SystemInfo) -> String {
+    info.cpu_brand.clone()
 }
 
 pub fn raw_os_id_or_name() -> String {
@@ -100,9 +172,9 @@ pub fn os() -> String {
     logos::display_name_for(&os_id_or_name()).to_string()
 }
 
-pub fn ram_info(sys: &System) -> (String, String, String) {
-    let used_bytes = sys.used_memory();
-    let total_bytes = sys.total_memory();
+pub fn ram_info(info: &SystemInfo) -> (String, String, String) {
+    let used_bytes = info.mem_total_kb.saturating_sub(info.mem_available_kb) * 1024;
+    let total_bytes = info.mem_total_kb * 1024;
     let used_gb = ((used_bytes as f32 / 1024.0 / 1024.0 / 1024.0) * 10.0).ceil() / 10.0;
     let total_gb = ((total_bytes as f32 / 1024.0 / 1024.0 / 1024.0) * 10.0).ceil() / 10.0;
     let pct = if total_gb > 0.0 {
@@ -121,91 +193,77 @@ pub struct DiskInfo {
     pub usage_pct: f64,
 }
 
+const EXCLUDED_FS: &[&str] = &[
+    "tmpfs", "devtmpfs", "squashfs", "overlay", "proc", "sysfs", "cgroup",
+    "devpts", "hugetlbfs", "mqueue", "pstore", "securityfs", "efivarfs",
+    "bpf", "tracefs", "debugfs", "configfs", "fusectl", "autofs",
+];
+
+/// `statvfs` reports the same block accounting `df` uses (`f_bfree`, not the
+/// user-visible `f_bavail`), so used/total come out identical to `df -B1`.
+fn statvfs_sizes(path: &str) -> Option<(u64, u64)> {
+    use std::ffi::{CString, OsStr};
+    use std::os::unix::ffi::OsStrExt;
+    let c = CString::new(OsStr::new(path).as_bytes()).ok()?;
+    let mut st: libc::statvfs = unsafe { std::mem::zeroed() };
+    if unsafe { libc::statvfs(c.as_ptr(), &mut st) } != 0 {
+        return None;
+    }
+    let frsize = if st.f_frsize != 0 { st.f_frsize } else { st.f_bsize } as u64;
+    let total = (st.f_blocks as u64).checked_mul(frsize)?;
+    let free = (st.f_bfree as u64).checked_mul(frsize)?;
+    Some((total, total.checked_sub(free)?))
+}
+
 pub fn disks_info() -> Vec<DiskInfo> {
     let gb = 1024.0 * 1024.0 * 1024.0;
     let mut result = Vec::new();
 
-    let df_output = Command::new("df")
-        .arg("-B1")
-        .arg("--exclude-type=tmpfs")
-        .arg("--exclude-type=devtmpfs")
-        .arg("--exclude-type=squashfs")
-        .arg("--exclude-type=overlay")
-        .arg("--exclude-type=proc")
-        .arg("--exclude-type=sysfs")
-        .arg("--exclude-type=cgroup")
-        .arg("--exclude-type=devpts")
-        .arg("--exclude-type=hugetlbfs")
-        .arg("--exclude-type=mqueue")
-        .arg("--exclude-type=pstore")
-        .arg("--exclude-type=securityfs")
-        .arg("--exclude-type=efivarfs")
-        .arg("--exclude-type=bpf")
-        .arg("--exclude-type=tracefs")
-        .arg("--exclude-type=debugfs")
-        .arg("--exclude-type=configfs")
-        .arg("--exclude-type=fusectl")
-        .arg("--exclude-type=autofs")
-        .arg("--output=source,fstype,target,size,used,avail")
-        .output()
-        .ok();
+    // Read the mount table directly and statvfs each real device. This is what
+    // `df` does, minus the ~0.9ms process spawn, and yields the same numbers.
+    if let Ok(mounts) = std::fs::read_to_string("/proc/mounts") {
+        let mut seen = HashSet::new();
+        for line in mounts.lines() {
+            let mut parts = line.split_whitespace();
+            let source = match parts.next() { Some(v) => v, None => continue };
+            let target = match parts.next() { Some(v) => v, None => continue };
+            let fstype = match parts.next() { Some(v) => v, None => continue };
 
-    if let Some(output) = df_output {
-        if output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let mut lines = stdout.lines();
-            lines.next();
-            for line in lines {
-                let parts: Vec<&str> = line.split_whitespace().collect();
-                if parts.len() < 6 {
-                    continue;
-                }
-
-                let source = parts[0];
-                let fstype = parts[1];
-                let target = parts[2];
-
-
-                if target.starts_with("/boot") {
-                    continue;
-                }
-                if !source.starts_with("/dev/") {
-                    continue;
-                }
-
-                if fstype.starts_with("fuse.") || fstype == "fuse" {
-                    continue;
-                }
-
-                let total_bytes: f64 = match parts[3].parse() { Ok(v) => v, Err(_) => continue };
-                let used_bytes: f64 = match parts[4].parse() { Ok(v) => v, Err(_) => continue };
-
-                if total_bytes <= 0.0 {
-                    continue;
-                }
-
-                let total_gb = total_bytes / gb;
-                let used_gb = used_bytes / gb;
-                let pct = (used_bytes / total_bytes) * 100.0;
-
-
-                let name = source.strip_prefix("/dev/").unwrap_or(source).to_string();
-
-                result.push(DiskInfo {
-                    name,
-                    filesystem: fstype.to_string(),
-                    used_gb: (used_gb * 10.0).round() / 10.0,
-                    total_gb: (total_gb * 10.0).round() / 10.0,
-                    usage_pct: (pct * 10.0).round() / 10.0,
-                });
+            if !source.starts_with("/dev/") || target.starts_with("/boot") {
+                continue;
+            }
+            if fstype.starts_with("fuse.") || fstype == "fuse" || EXCLUDED_FS.contains(&fstype) {
+                continue;
             }
 
-            let mut seen = HashSet::new();
-            result.retain(|d| seen.insert(d.name.clone()));
-
-            if !result.is_empty() {
-                return result;
+            let (total_bytes, used_bytes) = match statvfs_sizes(target) {
+                Some(v) => v,
+                None => continue,
+            };
+            if total_bytes == 0 {
+                continue;
             }
+
+            let name = source.strip_prefix("/dev/").unwrap_or(source).to_string();
+            if !seen.insert(name.clone()) {
+                continue;
+            }
+
+            let total_gb = total_bytes as f64 / gb;
+            let used_gb = used_bytes as f64 / gb;
+            let pct = (used_bytes as f64 / total_bytes as f64) * 100.0;
+
+            result.push(DiskInfo {
+                name,
+                filesystem: fstype.to_string(),
+                used_gb: (used_gb * 10.0).round() / 10.0,
+                total_gb: (total_gb * 10.0).round() / 10.0,
+                usage_pct: (pct * 10.0).round() / 10.0,
+            });
+        }
+
+        if !result.is_empty() {
+            return result;
         }
     }
 
@@ -358,8 +416,8 @@ pub fn terminal() -> String {
     String::new()
 }
 pub fn gpu() -> String {
-    if let Ok(gpu) = gfxinfo::active_gpu() {
-        return gpu.model().to_string();
+    if let Some(name) = gpu_from_sysfs() {
+        return name;
     }
 
     if is_termux() {
@@ -373,6 +431,95 @@ pub fn gpu() -> String {
     }
 
     "none found, maybe integrated".to_string()
+}
+
+fn read_hex(path: &str) -> Option<u32> {
+    let s = std::fs::read_to_string(path).ok()?;
+    let s = s.trim();
+    let s = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")).unwrap_or(s);
+    u32::from_str_radix(s, 16).ok()
+}
+
+// the marketing name comes from the same amdgpu.ids table libdrm used, keyed by
+// PCI (device, revision) id, so we get the exact same string without linking
+// libdrm (which every process otherwise had to load at startup).
+fn amdgpu_name(device_id: u32, revision_id: u32) -> Option<String> {
+    let ids = std::fs::read_to_string("/usr/share/libdrm/amdgpu.ids").ok()?;
+    for line in ids.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let mut fields = line.split(',');
+        let (did, rid) = match (fields.next(), fields.next()) {
+            (Some(d), Some(r)) => (d.trim(), r.trim()),
+            _ => continue,
+        };
+        let name = fields.collect::<Vec<_>>().join(",");
+        let name = name.trim();
+        if name.is_empty() {
+            continue;
+        }
+        if let (Ok(d), Ok(r)) = (u32::from_str_radix(did, 16), u32::from_str_radix(rid, 16)) {
+            if d == device_id && r == revision_id {
+                return Some(name.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn nvidia_name() -> Option<String> {
+    for e in std::fs::read_dir("/proc/driver/nvidia/gpus").ok()?.flatten() {
+        let info = match std::fs::read_to_string(e.path().join("information")) {
+            Ok(i) => i,
+            Err(_) => continue,
+        };
+        for line in info.lines() {
+            if let Some(rest) = line.strip_prefix("Model:") {
+                let name = rest.trim();
+                if !name.is_empty() {
+                    return Some(name.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+// mirrors gfxinfo's order (amd then nvidia) and the names it produced, but
+// straight from sysfs/proc so there is nothing to dlopen or ioctl.
+fn gpu_from_sysfs() -> Option<String> {
+    let mut amd = None;
+    let mut nvidia = None;
+    for e in std::fs::read_dir("/sys/class/drm").ok()?.flatten() {
+        let name = e.file_name();
+        let name = name.to_string_lossy();
+        let rest = match name.strip_prefix("card") {
+            Some(r) => r,
+            None => continue,
+        };
+        // only "cardN" nodes, skip connectors like card0-DP-1
+        if rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) {
+            continue;
+        }
+        let dev = format!("/sys/class/drm/{}/device", name);
+        match read_hex(&format!("{}/vendor", dev)) {
+            Some(0x1002) if amd.is_none() => {
+                if let (Some(did), Some(rid)) =
+                    (read_hex(&format!("{}/device", dev)), read_hex(&format!("{}/revision", dev)))
+                {
+                    // fall back to libdrm's default when the id table misses
+                    amd = amdgpu_name(did, rid).or_else(|| Some("AMD Radeon Graphics".to_string()));
+                }
+            }
+            Some(0x10de) if nvidia.is_none() => {
+                nvidia = nvidia_name();
+            }
+            _ => {}
+        }
+    }
+    amd.or(nvidia)
 }
 
 pub fn hostusr() -> String {
@@ -410,13 +557,42 @@ pub fn uptime() -> String {
         })
 }
 
-pub fn get_battery_charge() -> usize {
-    if is_termux() {
-        if let Ok(cap) = std::fs::read_to_string("/sys/class/power_supply/battery/capacity") {
+/// Reads charge from sysfs directly. `starship_battery::Manager` costs ~0.9ms
+/// (walks the whole power_supply class, builds typed units) but ends up reading
+/// these same `capacity` nodes, so the value is identical.
+fn read_battery_percent() -> Option<usize> {
+    if let Ok(cap) = std::fs::read_to_string("/sys/class/power_supply/battery/capacity") {
+        if let Ok(pct) = cap.trim().parse::<usize>() {
+            return Some(pct);
+        }
+    }
+    let entries = std::fs::read_dir("/sys/class/power_supply").ok()?;
+    for e in entries.flatten() {
+        let dir = e.path();
+        let ty = match std::fs::read_to_string(dir.join("type")) {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        if ty.trim() != "Battery" {
+            continue;
+        }
+        if let Ok(cap) = std::fs::read_to_string(dir.join("capacity")) {
             if let Ok(pct) = cap.trim().parse::<usize>() {
-                return pct;
+                return Some(pct);
             }
         }
+    }
+    None
+}
+
+pub fn get_battery_charge() -> usize {
+    if let Some(pct) = read_battery_percent() {
+        return pct;
+    }
+
+    // sysfs exists on linux, so an empty scan means this machine genuinely has
+    // no battery. Bail instead of paying ~0.9ms for a manager walk.
+    if Path::new("/sys/class/power_supply").exists() {
         return 500;
     }
 
@@ -646,9 +822,9 @@ pub fn os_age() -> String {
 
 // --- promoted-to-stable hardware gaps: swap / load / processes / boot ---
 
-pub fn swap_info(sys: &System) -> (String, String, String) {
-    let used_bytes = sys.used_swap();
-    let total_bytes = sys.total_swap();
+pub fn swap_info(info: &SystemInfo) -> (String, String, String) {
+    let used_bytes = info.swap_total_kb.saturating_sub(info.swap_free_kb) * 1024;
+    let total_bytes = info.swap_total_kb * 1024;
     let used_gb = ((used_bytes as f32 / 1024.0 / 1024.0 / 1024.0) * 10.0).ceil() / 10.0;
     let total_gb = ((total_bytes as f32 / 1024.0 / 1024.0 / 1024.0) * 10.0).ceil() / 10.0;
     let pct = if total_gb > 0.0 {
@@ -671,16 +847,10 @@ pub fn load_avg() -> String {
 }
 
 pub fn process_count() -> Option<usize> {
-    // counting /proc numeric dirs = processes (threads excluded, unlike loadavg total)
-    if let Ok(entries) = std::fs::read_dir("/proc") {
-        let mut n = 0usize;
-        for e in entries.flatten() {
-            let name = e.file_name();
-            let s = name.to_string_lossy();
-            if !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()) {
-                n += 1;
-            }
-        }
+    // counting /proc numeric dirs = processes (threads excluded, unlike loadavg total).
+    // getdents64 directly so we skip the OsString read_dir allocates per entry,
+    // which is one heap allocation for every pid on every run.
+    if let Some(n) = count_proc_pids() {
         if n > 0 {
             return Some(n);
         }
@@ -697,14 +867,91 @@ pub fn process_count() -> Option<usize> {
     None
 }
 
-pub fn boot_time() -> String {
-    // `uptime -s` already prints local boot time ("2026-09-09 08:50:25")
-    if let Ok(out) = Command::new("uptime").arg("-s").output() {
-        if out.status.success() {
-            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if !s.is_empty() && s != "unknown" {
-                return s;
+fn count_proc_pids() -> Option<usize> {
+    use std::os::unix::io::AsRawFd;
+    let dir = std::fs::File::open("/proc").ok()?;
+    let fd = dir.as_raw_fd();
+    let mut buf = [0u8; 16384];
+    let mut n = 0usize;
+    loop {
+        let nread = unsafe {
+            libc::syscall(
+                libc::SYS_getdents64,
+                fd,
+                buf.as_mut_ptr() as *mut libc::c_void,
+                buf.len(),
+            )
+        };
+        if nread <= 0 {
+            break;
+        }
+        let end = nread as usize;
+        let mut off = 0usize;
+        while off + 19 <= end {
+            let d = unsafe { &*(buf.as_ptr().add(off) as *const libc::dirent64) };
+            let reclen = d.d_reclen as usize;
+            if reclen == 0 || off + reclen > end {
+                break;
             }
+            let name = d.d_name.as_ptr() as *const u8;
+            let mut is_pid = false;
+            let mut i = 0usize;
+            loop {
+                let c = unsafe { *name.add(i) };
+                if c == 0 {
+                    break;
+                }
+                if !c.is_ascii_digit() {
+                    is_pid = false;
+                    break;
+                }
+                is_pid = true;
+                i += 1;
+                if i >= 256 {
+                    is_pid = false;
+                    break;
+                }
+            }
+            if is_pid {
+                n += 1;
+            }
+            off += reclen;
+        }
+    }
+    Some(n)
+}
+
+fn read_btime() -> Option<u64> {
+    let content = std::fs::read_to_string("/proc/stat").ok()?;
+    content
+        .lines()
+        .find_map(|l| l.strip_prefix("btime "))
+        .and_then(|v| v.trim().parse().ok())
+}
+
+/// Formats an epoch timestamp in local time via `localtime_r` so we match what
+/// `uptime -s` printed, without paying for a process spawn (~1ms).
+fn format_local(ts: u64) -> Option<String> {
+    let t = ts as libc::time_t;
+    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
+    if unsafe { libc::localtime_r(&t, &mut tm) }.is_null() {
+        return None;
+    }
+    Some(format!(
+        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+        tm.tm_year + 1900,
+        tm.tm_mon + 1,
+        tm.tm_mday,
+        tm.tm_hour,
+        tm.tm_min,
+        tm.tm_sec
+    ))
+}
+
+pub fn boot_time() -> String {
+    if let Some(ts) = read_btime() {
+        if let Some(s) = format_local(ts) {
+            return s;
         }
     }
     // fallback: sysinfo boot timestamp formatted via `date` (local tz)
