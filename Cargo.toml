@@ -17,7 +17,7 @@ codegen-units = 1
 strip = true
 
 [dependencies]
-sysinfo = "0.33"
+sysinfo = "0.36"
 whoami = "1.5"
 starship-battery = "0.11"
 serde = { version = "1.0", features = ["derive"] }
