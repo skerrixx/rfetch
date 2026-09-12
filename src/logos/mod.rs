@@ -110,7 +110,7 @@ fn lookup(name: &str) -> Option<&'static Logo> {
     LOGOS
         .iter()
         .copied()
-        .find(|logo| logo.id == v.as_str() || logo.aliases.iter().any(|alias| *alias == v.as_str()))
+        .find(|logo| logo.id == v.as_str() || logo.aliases.contains(&v.as_str()))
 }
 
 /// ascii art for `name`, falling back to the generic tux art.

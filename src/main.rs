@@ -3,14 +3,15 @@ mod config;
 mod pkgs;
 use colored::Colorize;
 use pkgs::getform;
-use rand;
 use std::collections::HashSet;
 use std::env;
 use std::io::{self, Write};
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
-use whoami;
+
+// sentinel for "no battery": keeps this value when the probe is hidden, fails, or no battery exists (basic.rs uses the same number)
+const NO_BATTERY: usize = 500;
 
 fn print_usage() {
     eprintln!("Usage: rfetch [options]");
@@ -166,7 +167,7 @@ fn random() {
             ];
             println!(
                 "fun fact about rfetch: {}",
-                facts[rand::random_range(0..facts.len() as usize)]
+                facts[rand::random_range(0..facts.len())]
             );
         }
         6 => {
@@ -181,9 +182,33 @@ fn random() {
     }
 }
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
+/// parsed CLI options (values and boolean flags). parsing stops at the first
+/// help/version/super flag, which is reported as an action instead.
+struct CliOptions {
+    distro_override: Option<String>,
+    clear_cache: bool,
+    cli_anonymize: bool,
+    json_output: bool,
+    minimal_output: bool,
+    no_art: bool,
+    logo_only: bool,
+    cli_ascii_path: Option<String>,
+}
 
+/// terminal action requested on the command line (first one wins).
+enum CliAction {
+    Help,
+    Version,
+    Super,
+}
+
+#[derive(Debug)]
+enum CliParseError {
+    MissingDistroValue,
+    MissingAsciiValue,
+}
+
+fn parse_args(args: &[String]) -> Result<(CliOptions, Option<CliAction>), CliParseError> {
     let mut distro_override: Option<String> = None;
     let mut clear_cache = false;
     let mut cli_anonymize = false;
@@ -192,24 +217,21 @@ fn main() {
     let mut no_art = false;
     let mut logo_only = false;
     let mut cli_ascii_path: Option<String> = None;
-    let mut i = 1;
+    let mut action: Option<CliAction> = None;
+    let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
             "--distro" | "-d" => {
                 i += 1;
                 if i >= args.len() {
-                    eprintln!("err: --distro / -d requires a value.");
-                    print_usage();
-                    std::process::exit(1);
+                    return Err(CliParseError::MissingDistroValue);
                 }
                 distro_override = Some(args[i].clone());
             }
             "--ascii" | "--ascii-path" | "--art" => {
                 i += 1;
                 if i >= args.len() {
-                    eprintln!("err: --ascii requires a file path.");
-                    print_usage();
-                    std::process::exit(1);
+                    return Err(CliParseError::MissingAsciiValue);
                 }
                 cli_ascii_path = Some(args[i].clone());
             }
@@ -232,28 +254,84 @@ fn main() {
                 clear_cache = true;
             }
             "--help" | "-h" => {
-                print_usage();
-                std::process::exit(0);
+                action = Some(CliAction::Help);
+                break;
             }
             "--super" => {
-                random();
-                std::process::exit(0);
+                action = Some(CliAction::Super);
+                break;
             }
             "--version" => {
-                println!(
-                    "rfetch v1.1.0\nmade with   by  skerrix and  francy\nwritten using 🦀 v1.100\nthanks to:\n   1. flingo\n   2. tromtom\n   3. those who installed it from the AUR\n   4. those who compiled it from source\n   5. you, for using rfetch!\n   {}\n{}{}{}",
-                    "francy is tuff\n".purple().italic(),
-                    "this code is licensed with ",
-                    "GPL-3.0".yellow(),
-                    ". microslop can suck our balls"
-                );
-                std::process::exit(0)
+                action = Some(CliAction::Version);
+                break;
             }
             _ => {
                 // just print the fetch if a flag is unknown (yeah skerrix youre very good at commenting(yes francy i am indeed awesome at commenting))
             }
         }
         i += 1;
+    }
+    Ok((
+        CliOptions {
+            distro_override,
+            clear_cache,
+            cli_anonymize,
+            json_output,
+            minimal_output,
+            no_art,
+            logo_only,
+            cli_ascii_path,
+        },
+        action,
+    ))
+}
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    let (opts, action) = match parse_args(&args[1..]) {
+        Ok(parsed) => parsed,
+        Err(CliParseError::MissingDistroValue) => {
+            eprintln!("err: --distro / -d requires a value.");
+            print_usage();
+            std::process::exit(1);
+        }
+        Err(CliParseError::MissingAsciiValue) => {
+            eprintln!("err: --ascii requires a file path.");
+            print_usage();
+            std::process::exit(1);
+        }
+    };
+    let CliOptions {
+        distro_override,
+        clear_cache,
+        cli_anonymize,
+        json_output,
+        minimal_output,
+        no_art,
+        logo_only,
+        cli_ascii_path,
+    } = opts;
+
+    match action {
+        Some(CliAction::Help) => {
+            print_usage();
+            std::process::exit(0);
+        }
+        Some(CliAction::Version) => {
+            println!(
+                "rfetch v{}\nmade with \u{f004}  by \u{e7a8} Skerrixx, \u{f0e7} Francy and \u{1f9ea} Spectr\nthanks to:\n   1. flingo\n   2. tromtom\n   3. those who installed it from the AUR\n   4. those who compiled it from source\n   5. you, for using rfetch!\n   {}\nthis code is licensed with {}. microslop can suck our balls",
+                env!("CARGO_PKG_VERSION"),
+                "francy is tuff\n".purple().italic(),
+                "GPL-3.0".yellow()
+            );
+            std::process::exit(0);
+        }
+        Some(CliAction::Super) => {
+            random();
+            std::process::exit(0);
+        }
+        None => {}
     }
 
     if clear_cache {
@@ -308,13 +386,6 @@ fn main() {
     let load_hidden = hidden("load") || hidden("loadavg") || hidden("load_avg");
     let procs_hidden = hidden("processes") || hidden("procs") || hidden("proc");
 
-    let os_display: String = if distro_override.is_some() {
-        basic::display_name_for(&distro_key).to_string()
-    } else {
-        basic::os()
-    };
-    let host_display: String = display_hostusr(anonymize);
-
     // --logo-only fast path: no info fetching at all
     if logo_only {
         let art_lines = load_art_lines(&distro_key, ascii_path_ref);
@@ -323,6 +394,13 @@ fn main() {
         }
         std::process::exit(0);
     }
+
+    let os_display: String = if distro_override.is_some() {
+        basic::display_name_for(&distro_key).to_string()
+    } else {
+        basic::os()
+    };
+    let host_display: String = display_hostusr(anonymize);
 
     // --minimal fast path: skip heavy collectors (pkgs, gpu, disks, battery)
     if minimal_output {
@@ -341,37 +419,37 @@ fn main() {
 
         thread::scope(|s| {
             let h_kernel = if !hidden("kernel") {
-                Some(s.spawn(|| basic::kernel()))
+                Some(s.spawn(basic::kernel))
             } else {
                 None
             };
             let h_uptime = if !hidden("uptime") {
-                Some(s.spawn(|| basic::uptime()))
+                Some(s.spawn(basic::uptime))
             } else {
                 None
             };
             let h_age = if !os_age_hidden {
-                Some(s.spawn(|| basic::os_age()))
+                Some(s.spawn(basic::os_age))
             } else {
                 None
             };
             let h_boot = if !boot_hidden {
-                Some(s.spawn(|| basic::boot_time()))
+                Some(s.spawn(basic::boot_time))
             } else {
                 None
             };
             let h_load = if !load_hidden {
-                Some(s.spawn(|| basic::load_avg()))
+                Some(s.spawn(basic::load_avg))
             } else {
                 None
             };
             let h_procs = if !procs_hidden {
-                Some(s.spawn(|| basic::process_count()))
+                Some(s.spawn(basic::process_count))
             } else {
                 None
             };
             let h_sys = if need_sys {
-                Some(s.spawn(|| fresh_system()))
+                Some(s.spawn(fresh_system))
             } else {
                 None
             };
@@ -400,7 +478,7 @@ fn main() {
         });
 
         let cpu_val = if cpu_shown {
-            sys.as_ref().map(|s| basic::cpu(s)).unwrap_or_default()
+            sys.as_ref().map(basic::cpu).unwrap_or_default()
         } else {
             String::new()
         };
@@ -487,7 +565,7 @@ fn main() {
     let mut boot_val = String::new();
     let mut gpu_val = String::new();
     let mut disk_infos = Vec::new();
-    let mut battery_charge: usize = 500;
+    let mut battery_charge: usize = NO_BATTERY;
     let mut packages_val: Option<String> = None;
     let mut cpu_val = String::new();
     let mut ram_vals: Option<(String, String, String)> = None;
@@ -509,22 +587,22 @@ fn main() {
 
     thread::scope(|s| {
         let h_kernel = if !hidden("kernel") {
-            Some(s.spawn(|| basic::kernel()))
+            Some(s.spawn(basic::kernel))
         } else {
             None
         };
         let h_uptime = if !hidden("uptime") {
-            Some(s.spawn(|| basic::uptime()))
+            Some(s.spawn(basic::uptime))
         } else {
             None
         };
         let h_os_age = if !os_age_hidden {
-            Some(s.spawn(|| basic::os_age()))
+            Some(s.spawn(basic::os_age))
         } else {
             None
         };
         let h_boot = if !boot_hidden {
-            Some(s.spawn(|| basic::boot_time()))
+            Some(s.spawn(basic::boot_time))
         } else {
             None
         };
@@ -539,7 +617,7 @@ fn main() {
             None
         };
         let h_disks = if !hidden("disk") {
-            Some(s.spawn(|| basic::disks_info()))
+            Some(s.spawn(basic::disks_info))
         } else {
             None
         };
@@ -547,13 +625,13 @@ fn main() {
         // previously it ran on every invocation even with "battery" in hide_info,
         // so hiding it saved zero time.
         let h_battery = if !hidden("battery") {
-            Some(s.spawn(|| basic::get_battery_charge()))
+            Some(s.spawn(basic::get_battery_charge))
         } else {
             None
         };
 
         let h_packages = if packages_shown {
-            Some(s.spawn(|| getform()))
+            Some(s.spawn(getform))
         } else {
             None
         };
@@ -581,27 +659,27 @@ fn main() {
             None
         };
         let h_load = if !load_hidden {
-            Some(s.spawn(|| basic::load_avg()))
+            Some(s.spawn(basic::load_avg))
         } else {
             None
         };
         let h_procs = if !procs_hidden {
-            Some(s.spawn(|| basic::process_count()))
+            Some(s.spawn(basic::process_count))
         } else {
             None
         };
         let h_wmde = if !dewm_hidden {
-            Some(s.spawn(|| basic::wmde()))
+            Some(s.spawn(basic::wmde))
         } else {
             None
         };
         let h_shell = if !shell_hidden {
-            Some(s.spawn(|| basic::shell()))
+            Some(s.spawn(basic::shell))
         } else {
             None
         };
         let h_term = if !term_hidden {
-            Some(s.spawn(|| basic::terminal()))
+            Some(s.spawn(basic::terminal))
         } else {
             None
         };
@@ -624,7 +702,9 @@ fn main() {
         if let Some(h) = h_disks {
             disk_infos = h.join().unwrap_or_default();
         }
-        battery_charge = h_battery.map(|h| h.join().unwrap_or(500)).unwrap_or(500);
+        battery_charge = h_battery
+            .map(|h| h.join().unwrap_or(NO_BATTERY))
+            .unwrap_or(NO_BATTERY);
         if let Some(h) = h_packages {
             packages_val = Some(h.join().unwrap_or_default());
         }
@@ -769,7 +849,7 @@ fn main() {
             obj.insert("disks".to_string(), serde_json::Value::Array(arr));
         }
         if !hidden("battery") {
-            if battery_charge != 500 {
+            if battery_charge != NO_BATTERY {
                 obj.insert("battery".to_string(), serde_json::json!(battery_charge));
             } else {
                 obj.insert("battery".to_string(), serde_json::Value::Null);
@@ -782,7 +862,6 @@ fn main() {
         std::process::exit(0);
     }
 
-    let art_lines: Vec<String> = load_art_lines(&distro_key, ascii_path_ref);
     let info_lines: Vec<String> = {
         let mut v = Vec::new();
         v.push(format!(
@@ -871,7 +950,7 @@ fn main() {
             }
         }
 
-        for (_i, line) in software.iter().enumerate() {
+        for line in software.iter() {
             v.push(format!(
                 "{}{}",
                 "  ",
@@ -879,7 +958,7 @@ fn main() {
             ));
         }
 
-        let has_battery = battery_charge != 500;
+        let has_battery = battery_charge != NO_BATTERY;
 
         if !hidden("headers") {
             if cfg.style == "boxed" {
@@ -978,7 +1057,7 @@ fn main() {
             }
         }
 
-        for (_i, line) in hardware.iter().enumerate() {
+        for line in hardware.iter() {
             v.push(format!(
                 "{}{}",
                 "  ",
@@ -1002,6 +1081,7 @@ fn main() {
         std::process::exit(0);
     }
 
+    let art_lines: Vec<String> = load_art_lines(&distro_key, ascii_path_ref);
     let art_width = art_lines
         .iter()
         .map(|l| l.chars().count())
@@ -1031,5 +1111,104 @@ fn main() {
                 println!("{colored_left}{:pad$} {right}", "");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(args: &[&str]) -> Result<(CliOptions, Option<CliAction>), CliParseError> {
+        let owned: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+        parse_args(&owned)
+    }
+
+    #[test]
+    fn no_args_give_defaults_and_no_action() {
+        let (opts, action) = parse(&[]).unwrap();
+        assert!(opts.distro_override.is_none());
+        assert!(!opts.clear_cache);
+        assert!(!opts.cli_anonymize);
+        assert!(!opts.json_output);
+        assert!(!opts.minimal_output);
+        assert!(!opts.no_art);
+        assert!(!opts.logo_only);
+        assert!(opts.cli_ascii_path.is_none());
+        assert!(action.is_none());
+    }
+
+    #[test]
+    fn distro_flag_takes_the_next_arg_as_value() {
+        let (opts, _) = parse(&["--distro", "arch"]).unwrap();
+        assert_eq!(opts.distro_override.as_deref(), Some("arch"));
+    }
+
+    #[test]
+    fn short_distro_flag_works() {
+        let (opts, _) = parse(&["-d", "fedora"]).unwrap();
+        assert_eq!(opts.distro_override.as_deref(), Some("fedora"));
+    }
+
+    #[test]
+    fn all_ascii_aliases_take_a_path() {
+        for flag in ["--ascii", "--ascii-path", "--art"] {
+            let (opts, _) = parse(&[flag, "~/art.txt"]).unwrap();
+            assert_eq!(opts.cli_ascii_path.as_deref(), Some("~/art.txt"));
+        }
+    }
+
+    #[test]
+    fn boolean_flags_can_combine() {
+        let (opts, _) = parse(&["-a", "--json", "-m", "--no-art", "--clear-cache"]).unwrap();
+        assert!(opts.cli_anonymize);
+        assert!(opts.json_output);
+        assert!(opts.minimal_output);
+        assert!(opts.no_art);
+        assert!(opts.clear_cache);
+    }
+
+    #[test]
+    fn logo_only_flag_sets() {
+        let (opts, _) = parse(&["--logo-only"]).unwrap();
+        assert!(opts.logo_only);
+    }
+
+    #[test]
+    fn version_action_stops_parsing() {
+        let (opts, action) = parse(&["--version", "--distro"]).unwrap();
+        assert!(matches!(action, Some(CliAction::Version)));
+        assert!(opts.distro_override.is_none());
+    }
+
+    #[test]
+    fn help_and_super_are_actions() {
+        assert!(matches!(parse(&["-h"]).unwrap().1, Some(CliAction::Help)));
+        assert!(matches!(
+            parse(&["--super"]).unwrap().1,
+            Some(CliAction::Super)
+        ));
+    }
+
+    #[test]
+    fn missing_distro_value_is_an_error() {
+        assert!(matches!(
+            parse(&["--distro"]),
+            Err(CliParseError::MissingDistroValue)
+        ));
+    }
+
+    #[test]
+    fn missing_ascii_value_is_an_error() {
+        assert!(matches!(
+            parse(&["--ascii"]),
+            Err(CliParseError::MissingAsciiValue)
+        ));
+    }
+
+    #[test]
+    fn unknown_flags_are_ignored() {
+        let (opts, action) = parse(&["--bogus", "--wat"]).unwrap();
+        assert!(opts.distro_override.is_none());
+        assert!(action.is_none());
     }
 }

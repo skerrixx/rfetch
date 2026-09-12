@@ -5,7 +5,6 @@ use std::env;
 use std::path::Path;
 use std::process::Command;
 use sysinfo::System;
-use whoami;
 
 #[path = "logos/mod.rs"]
 mod logos;
@@ -24,55 +23,46 @@ pub fn is_termux() -> bool {
     std::fs::exists("/data/data/com.termux").unwrap_or(false)
 }
 
+/// value of `key` in an os-release style `KEY=VALUE` file, quotes stripped.
+fn extract_value(content: &str, key: &str) -> Option<String> {
+    for line in content.lines() {
+        if let Some(rest) = line.strip_prefix(&format!("{}=", key)) {
+            let v = rest.trim();
+            return Some(v.trim_start_matches('"').trim_end_matches('"').to_string());
+        }
+    }
+    None
+}
+
 fn os_id_or_name() -> String {
     if is_termux() {
         return String::from("android");
     }
-    if std::fs::exists("/bedrock/strata/bedrock/etc/os-release").unwrap() {
+    if std::fs::exists("/bedrock/strata/bedrock/etc/os-release").unwrap_or(false) {
         let content = match std::fs::read_to_string("/bedrock/strata/bedrock/etc/os-release") {
             Ok(c) => c,
             Err(_) => return String::from(""),
         };
-
-        fn extract_value(content: &str, key: &str) -> Option<String> {
-            for line in content.lines() {
-                if let Some(rest) = line.strip_prefix(&format!("{}=", key)) {
-                    let v = rest.trim();
-                    return Some(v.trim_start_matches('"').trim_end_matches('"').to_string());
-                }
-            }
-            None
-        }
-
-        extract_value(&content, "ID")
+        return extract_value(&content, "ID")
             .or_else(|| extract_value(&content, "NAME"))
-            .unwrap_or_default()
-    } else if std::fs::exists("/etc/os-release").unwrap() {
+            .unwrap_or_default();
+    }
+    if std::fs::exists("/etc/os-release").unwrap_or(false) {
         let content = match std::fs::read_to_string("/etc/os-release") {
             Ok(c) => c,
             Err(_) => return String::from(""),
         };
-
-        fn extract_value(content: &str, key: &str) -> Option<String> {
-            for line in content.lines() {
-                if let Some(rest) = line.strip_prefix(&format!("{}=", key)) {
-                    let v = rest.trim();
-                    return Some(v.trim_start_matches('"').trim_end_matches('"').to_string());
-                }
-            }
-            None
-        }
-
-        extract_value(&content, "ID")
+        return extract_value(&content, "ID")
             .or_else(|| extract_value(&content, "NAME"))
-            .unwrap_or_default()
-    } else {
-        let os = String::from_utf8(Command::new("uname").arg("s").output().expect("").stdout)
-            .expect("")
-            .to_string()
-            .to_lowercase();
-        return os;
+            .unwrap_or_default();
     }
+    Command::new("uname")
+        .arg("s")
+        .output()
+        .ok()
+        .and_then(|out| String::from_utf8(out.stdout).ok())
+        .map(|s| s.trim().to_lowercase())
+        .unwrap_or_default()
 }
 
 /// hot-path replacement for `sysinfo::System`.
@@ -175,16 +165,21 @@ pub fn os() -> String {
     logos::display_name_for(&os_id_or_name()).to_string()
 }
 
+/// rounded percentage from raw byte counts (0 when total is 0), never from
+/// the rounded gib display values.
+fn usage_pct(used_bytes: u64, total_bytes: u64) -> u32 {
+    if total_bytes == 0 {
+        return 0;
+    }
+    (used_bytes as f64 * 100.0 / total_bytes as f64).round() as u32
+}
+
 pub fn ram_info(info: &SystemInfo) -> (String, String, String) {
     let used_bytes = info.mem_total_kb.saturating_sub(info.mem_available_kb) * 1024;
     let total_bytes = info.mem_total_kb * 1024;
-    let used_gb = ((used_bytes as f32 / 1024.0 / 1024.0 / 1024.0) * 10.0).ceil() / 10.0;
-    let total_gb = ((total_bytes as f32 / 1024.0 / 1024.0 / 1024.0) * 10.0).ceil() / 10.0;
-    let pct = if total_gb > 0.0 {
-        ((used_gb / total_gb) * 100.0).round() as u32
-    } else {
-        0
-    };
+    let used_gb = ((used_bytes as f64 / 1024.0 / 1024.0 / 1024.0) * 10.0).ceil() / 10.0;
+    let total_gb = ((total_bytes as f64 / 1024.0 / 1024.0 / 1024.0) * 10.0).ceil() / 10.0;
+    let pct = usage_pct(used_bytes, total_bytes);
     (used_gb.to_string(), total_gb.to_string(), pct.to_string())
 }
 
@@ -204,6 +199,7 @@ const EXCLUDED_FS: &[&str] = &[
     "proc",
     "sysfs",
     "cgroup",
+    "cgroup2",
     "devpts",
     "hugetlbfs",
     "mqueue",
@@ -216,6 +212,12 @@ const EXCLUDED_FS: &[&str] = &[
     "configfs",
     "fusectl",
     "autofs",
+    "ramfs",
+    "nsfs",
+    "rpc_pipefs",
+    "binfmt_misc",
+    "nfsd",
+    "selinuxfs",
 ];
 
 /// `statvfs` reports the same block accounting `df` uses (`f_bfree`, not the
@@ -242,8 +244,8 @@ pub fn disks_info() -> Vec<DiskInfo> {
     let gb = 1024.0 * 1024.0 * 1024.0;
     let mut result = Vec::new();
 
-    // read the mount table directly and statvfs each real device. this is what
-    // `df` does, minus the ~0.9ms process spawn, and yields the same numbers.
+    // read the mount table directly and statvfs each real filesystem. this is
+    // what `df` does, minus the ~0.9ms process spawn, and yields the same numbers.
     if let Ok(mounts) = std::fs::read_to_string("/proc/mounts") {
         let mut seen = HashSet::new();
         for line in mounts.lines() {
@@ -261,7 +263,13 @@ pub fn disks_info() -> Vec<DiskInfo> {
                 None => continue,
             };
 
-            if !source.starts_with("/dev/") || target.starts_with("/boot") {
+            // real filesystems only: block devices, network mounts (host:/export)
+            // and zfs datasets (pool/dataset). a source that is a plain directory
+            // (bind mount) would just duplicate the stats of its origin mount.
+            let real_source = source.starts_with("/dev/")
+                || source.contains(':')
+                || (!source.is_empty() && !source.starts_with('/'));
+            if !real_source {
                 continue;
             }
             if fstype.starts_with("fuse.") || fstype == "fuse" || EXCLUDED_FS.contains(&fstype) {
@@ -317,6 +325,7 @@ pub fn disks_info() -> Vec<DiskInfo> {
             "proc",
             "sysfs",
             "cgroup",
+            "cgroup2",
             "devpts",
             "hugetlbfs",
             "mqueue",
@@ -328,14 +337,10 @@ pub fn disks_info() -> Vec<DiskInfo> {
             "debugfs",
             "configfs",
             "autofs",
+            "ramfs",
             "efiivarfs",
         ];
         if skip_fs.contains(&fs_name.as_ref()) {
-            continue;
-        }
-
-        let mountpoint = disk.mount_point().to_string_lossy().to_string();
-        if mountpoint.starts_with("/boot") {
             continue;
         }
 
@@ -374,7 +379,10 @@ pub fn disks_info() -> Vec<DiskInfo> {
 }
 
 pub fn wmde() -> String {
-    let unp_de = env::var("XDG_CURRENT_DESKTOP").unwrap_or_else(|_| "rfetch".to_string());
+    let unp_de = match env::var("XDG_CURRENT_DESKTOP") {
+        Ok(v) if !v.trim().is_empty() => v,
+        _ => return String::from("unknown"),
+    };
     match unp_de.to_lowercase().as_str() {
         "gnome" => String::from(" gnome"),
         "kde" | "plasma" => String::from(" kde"),
@@ -398,8 +406,14 @@ pub fn kernel() -> String {
     std::fs::read_to_string("/proc/sys/kernel/osrelease")
         .map(|s| format!("󰌽 linux {}", s.trim()))
         .unwrap_or_else(|_| {
-            let output = Command::new("uname").arg("-sr").output().expect("");
-            String::from_utf8_lossy(&output.stdout).trim().to_string()
+            Command::new("uname")
+                .arg("-sr")
+                .output()
+                .ok()
+                .filter(|out| out.status.success())
+                .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "unknown".to_string())
         })
 }
 pub fn shell() -> String {
@@ -412,13 +426,16 @@ pub fn shell() -> String {
 
     if let Ok(passwd) = std::fs::read_to_string("/etc/passwd") {
         let username = std::env::var("USER").unwrap_or_default();
-        for line in passwd.lines() {
-            if line.starts_with(&format!("{}:", username)) {
-                if let Some(shell) = line.split(':').last() {
-                    sh_unp = Path::new(shell)
-                        .file_name()
-                        .map(|s| s.to_string_lossy().to_string())
-                        .unwrap_or_else(|| "unknown".to_string());
+        // an unset USER would make the prefix ":" below match the wrong entry
+        if !username.is_empty() {
+            for line in passwd.lines() {
+                if line.starts_with(&format!("{}:", username)) {
+                    if let Some(shell) = line.split(':').next_back() {
+                        sh_unp = Path::new(shell)
+                            .file_name()
+                            .map(|s| s.to_string_lossy().to_string())
+                            .unwrap_or_else(|| "unknown".to_string());
+                    }
                 }
             }
         }
@@ -435,36 +452,31 @@ pub fn shell() -> String {
     }
 }
 
+/// terminal display name from the env. TERM_PROGRAM names the emulator itself
+/// (e.g. "iTerm.app") while TERM is only a terminfo id (e.g. "xterm-256color"),
+/// so TERM is consulted only when TERM_PROGRAM is unset/empty.
+fn terminal_name(term_program: Option<&str>, term: Option<&str>) -> Option<String> {
+    let raw = term_program
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .or_else(|| term.map(str::trim).filter(|s| !s.is_empty()))?;
+    Some(match raw.to_lowercase().as_str() {
+        "alacritty" => "󱐋 alacritty".to_string(),
+        "xterm-kitty" => " kitty".to_string(),
+        "tabby" => " tabby".to_string(),
+        "foot" => " foot".to_string(),
+        "xterm-256color" => " DE terminal".to_string(),
+        "xterm-ghostty" => "󰊠 ghostty".to_string(),
+        _ => format!(" {}", raw.to_lowercase()),
+    })
+}
+
 pub fn terminal() -> String {
-    let mut unp_t = String::new();
-    if let Some(term_program) = std::env::var("TERM_PROGRAM")
-        .ok()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-    {
-        unp_t = term_program;
-    }
-
-    if let Some(term) = std::env::var("TERM")
-        .ok()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-    {
-        unp_t = term;
-    }
-    if !unp_t.is_empty() {
-        return match unp_t.to_lowercase().as_str() {
-            "alacritty" => "󱐋 alacritty".to_string(),
-            "xterm-kitty" => " kitty".to_string(),
-            "tabby" => " tabby".to_string(),
-            "foot" => " foot".to_string(),
-            "xterm-256color" => " DE terminal".to_string(),
-            "xterm-ghostty" => "󰊠 ghostty".to_string(),
-            _ => format!(" {}", unp_t.to_lowercase()),
-        };
-    }
-
-    String::new()
+    terminal_name(
+        std::env::var("TERM_PROGRAM").ok().as_deref(),
+        std::env::var("TERM").ok().as_deref(),
+    )
+    .unwrap_or_default()
 }
 pub fn gpu() -> String {
     if let Some(name) = gpu_from_sysfs() {
@@ -618,10 +630,14 @@ pub fn uptime() -> String {
             Some(parts.join(", "))
         })
         .unwrap_or_else(|| {
-            let output = Command::new("uptime").arg("-p").output().expect("");
-            String::from_utf8_lossy(&output.stdout)
-                .trim()
-                .to_string()
+            Command::new("uptime")
+                .arg("-p")
+                .output()
+                .ok()
+                .filter(|out| out.status.success())
+                .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "unknown".to_string())
                 .replace("up ", "")
         })
 }
@@ -720,18 +736,31 @@ fn pacman_log_install_time() -> Option<SystemTime> {
         if !line.starts_with('[') || line.len() < 11 {
             continue;
         }
-        // extract YYYY-MM-DD inside brackets
-        let end = line.find(']')?;
+        // extract YYYY-MM-DD inside brackets; a malformed line only skips
+        // itself, it must not discard a valid timestamp on a later line
+        let end = match line.find(']') {
+            Some(e) => e,
+            None => continue,
+        };
         let inner = &line[1..end];
         // inner is like 2026-09-07T20:47:00+0200, take date part
-        if inner.len() < 10 {
-            continue;
-        }
-        let date_part = &inner[0..10];
+        let date_part = match inner.get(0..10) {
+            Some(p) => p,
+            None => continue,
+        };
         let mut parts = date_part.split('-');
-        let y: i32 = parts.next()?.parse().ok()?;
-        let m: u32 = parts.next()?.parse().ok()?;
-        let d: u32 = parts.next()?.parse().ok()?;
+        let y: i32 = match parts.next().and_then(|p| p.parse().ok()) {
+            Some(v) => v,
+            None => continue,
+        };
+        let m: u32 = match parts.next().and_then(|p| p.parse().ok()) {
+            Some(v) => v,
+            None => continue,
+        };
+        let d: u32 = match parts.next().and_then(|p| p.parse().ok()) {
+            Some(v) => v,
+            None => continue,
+        };
         if !(1..=12).contains(&m) || !(1..=31).contains(&d) {
             continue;
         }
@@ -782,13 +811,18 @@ fn format_install_date(t: SystemTime) -> Option<String> {
 }
 
 fn format_age_duration(secs: u64) -> String {
+    // boundaries: <1 min "just now"; minutes below an hour; hours below a day;
+    // days below 30; then months (30-day) and years (365-day) with remainder.
     let days = secs / 86400;
     if days == 0 {
         let hours = secs / 3600;
         if hours == 0 {
             let mins = secs / 60;
-            if mins <= 1 {
+            if mins < 1 {
                 return "just now".to_string();
+            }
+            if mins == 1 {
+                return "1 minute".to_string();
             }
             return format!("{} minutes", mins);
         }
@@ -903,13 +937,9 @@ pub fn os_age() -> String {
 pub fn swap_info(info: &SystemInfo) -> (String, String, String) {
     let used_bytes = info.swap_total_kb.saturating_sub(info.swap_free_kb) * 1024;
     let total_bytes = info.swap_total_kb * 1024;
-    let used_gb = ((used_bytes as f32 / 1024.0 / 1024.0 / 1024.0) * 10.0).ceil() / 10.0;
-    let total_gb = ((total_bytes as f32 / 1024.0 / 1024.0 / 1024.0) * 10.0).ceil() / 10.0;
-    let pct = if total_gb > 0.0 {
-        ((used_gb / total_gb) * 100.0).round() as u32
-    } else {
-        0
-    };
+    let used_gb = ((used_bytes as f64 / 1024.0 / 1024.0 / 1024.0) * 10.0).ceil() / 10.0;
+    let total_gb = ((total_bytes as f64 / 1024.0 / 1024.0 / 1024.0) * 10.0).ceil() / 10.0;
+    let pct = usage_pct(used_bytes, total_bytes);
     (used_gb.to_string(), total_gb.to_string(), pct.to_string())
 }
 
@@ -1050,4 +1080,130 @@ pub fn boot_time() -> String {
         }
     }
     "unknown".to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn days_from_civil_known_dates() {
+        assert_eq!(days_from_civil(1970, 1, 1), 0);
+        assert_eq!(days_from_civil(1970, 1, 2), 1);
+        assert_eq!(days_from_civil(1969, 12, 31), -1);
+        assert_eq!(days_from_civil(2000, 1, 1), 10957);
+        assert_eq!(days_from_civil(2026, 9, 7), 20703);
+    }
+
+    #[test]
+    fn civil_from_days_known_dates() {
+        assert_eq!(civil_from_days(0), (1970, 1, 1));
+        assert_eq!(civil_from_days(-1), (1969, 12, 31));
+        assert_eq!(civil_from_days(10957), (2000, 1, 1));
+    }
+
+    #[test]
+    fn civil_days_roundtrip() {
+        for days in -100_000..=100_000i64 {
+            let (y, m, d) = civil_from_days(days);
+            assert_eq!(
+                days_from_civil(y, m, d),
+                days,
+                "roundtrip failed for {days}"
+            );
+        }
+    }
+
+    #[test]
+    fn format_age_duration_boundaries() {
+        assert_eq!(format_age_duration(0), "just now");
+        assert_eq!(format_age_duration(59), "just now");
+        assert_eq!(format_age_duration(60), "1 minute");
+        assert_eq!(format_age_duration(119), "1 minute");
+        assert_eq!(format_age_duration(3540), "59 minutes");
+        assert_eq!(format_age_duration(3600), "1 hour");
+        assert_eq!(format_age_duration(7200), "2 hours");
+        assert_eq!(format_age_duration(86_399), "23 hours");
+        assert_eq!(format_age_duration(86_400), "1 day");
+        assert_eq!(format_age_duration(2 * 86_400), "2 days");
+        assert_eq!(format_age_duration(29 * 86_400), "29 days");
+        assert_eq!(format_age_duration(30 * 86_400), "1 month");
+        assert_eq!(format_age_duration(61 * 86_400), "2 months 1 day");
+        assert_eq!(format_age_duration(365 * 86_400), "1 year");
+        assert_eq!(format_age_duration(395 * 86_400), "1 year 1 month");
+    }
+
+    #[test]
+    fn extract_value_reads_key_values() {
+        let content = "ID=\"arch\"\nPRETTY_NAME=\"Arch Linux\"\nID_LIKE=arch\n";
+        assert_eq!(extract_value(content, "ID").as_deref(), Some("arch"));
+        assert_eq!(
+            extract_value(content, "PRETTY_NAME").as_deref(),
+            Some("Arch Linux")
+        );
+        assert_eq!(extract_value(content, "ID_LIKE").as_deref(), Some("arch"));
+        assert_eq!(extract_value(content, "NAME"), None);
+    }
+
+    #[test]
+    fn terminal_prefers_term_program() {
+        assert_eq!(
+            terminal_name(Some("iTerm.app"), Some("xterm-256color")).as_deref(),
+            Some("\u{f120} iterm.app")
+        );
+        assert_eq!(
+            terminal_name(None, Some("xterm-256color")).as_deref(),
+            Some("\u{f489} DE terminal")
+        );
+        assert_eq!(
+            terminal_name(Some(""), Some("xterm-kitty")).as_deref(),
+            Some("\u{eeed} kitty")
+        );
+        assert_eq!(terminal_name(None, None), None);
+        assert_eq!(
+            terminal_name(Some("  "), Some("foot")).as_deref(),
+            Some("\u{f361} foot")
+        );
+    }
+
+    #[test]
+    fn usage_pct_computed_from_raw_bytes() {
+        assert_eq!(usage_pct(0, 0), 0);
+        assert_eq!(usage_pct(50, 100), 50);
+        assert_eq!(usage_pct(1, 3), 33);
+        let gib = 1024u64 * 1024 * 1024;
+        assert_eq!(usage_pct(gib + 1, 2 * gib), 50);
+    }
+
+    #[test]
+    fn ram_info_percent_uses_raw_bytes_not_rounded_display() {
+        let gib_kb = 1024u64 * 1024;
+        let info = SystemInfo {
+            cpu_brand: String::new(),
+            mem_total_kb: 2 * gib_kb,
+            mem_available_kb: gib_kb - 1,
+            swap_total_kb: 0,
+            swap_free_kb: 0,
+        };
+        let (used, total, pct) = ram_info(&info);
+        assert_eq!(pct, "50");
+        assert_eq!(used, "1.1");
+        assert_eq!(total, "2");
+    }
+
+    #[test]
+    fn swap_info_percent_uses_raw_bytes() {
+        let gib_kb = 1024u64 * 1024;
+        let info = SystemInfo {
+            cpu_brand: String::new(),
+            mem_total_kb: 0,
+            mem_available_kb: 0,
+            swap_total_kb: 4 * gib_kb,
+            swap_free_kb: 2 * gib_kb - 1,
+        };
+        let (used, total, pct) = swap_info(&info);
+        assert_eq!(pct, "50");
+        assert_eq!(used, "2.1");
+        assert_eq!(total, "4");
+    }
 }
