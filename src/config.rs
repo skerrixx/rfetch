@@ -1,18 +1,18 @@
+use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use colored::Colorize;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum AsciiColorMode {
-	Enabled(bool),
-	Color(String),
+    Enabled(bool),
+    Color(String),
 }
 
 impl Default for AsciiColorMode {
-	fn default() -> Self {
-		AsciiColorMode::Enabled(true)
-	}
+    fn default() -> Self {
+        AsciiColorMode::Enabled(true)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,12 +23,12 @@ pub struct Config {
     pub color_infotext: String,
     #[serde(default = "defhide")]
     pub hide_info: Vec<String>,
-	#[serde(default = "defstyle")]
-	pub style: String,
-	#[serde(default)]
-	pub anonymize: bool,
-	#[serde(default)]
-	pub ascii_path: Option<String>,
+    #[serde(default = "defstyle")]
+    pub style: String,
+    #[serde(default)]
+    pub anonymize: bool,
+    #[serde(default)]
+    pub ascii_path: Option<String>,
 }
 
 fn defacolor() -> AsciiColorMode {
@@ -53,9 +53,9 @@ impl Default for Config {
             color_ascii: defacolor(),
             color_infotext: deficolor(),
             hide_info: defhide(),
-			style: defstyle(),
-			anonymize: false,
-			ascii_path: None,
+            style: defstyle(),
+            anonymize: false,
+            ascii_path: None,
         }
     }
 }
@@ -165,7 +165,13 @@ pub fn load_config() -> Config {
 
 fn first_run_setup() -> Config {
     println!("welcome!");
-    println!("{}{}{}{}","it seems it's your ", "first".red(), " time using ", "rfetch!".blue());
+    println!(
+        "{}{}{}{}",
+        "it seems it's your ",
+        "first".red(),
+        " time using ",
+        "rfetch!".blue()
+    );
     println!(
         "\nwe haven't found a rfetch configuration file found at {}.",
         config_path().display()
@@ -190,7 +196,10 @@ fn first_run_setup() -> Config {
     match std::fs::write(&config_path(), default_config_content()) {
         Ok(_) => {
             eprintln!();
-            eprintln!("your config is created! it's located at {}.", config_path().display());
+            eprintln!(
+                "your config is created! it's located at {}.",
+                config_path().display()
+            );
             eprintln!("you can edit it anytime to customize rfetch.");
         }
         Err(e) => {
@@ -205,4 +214,3 @@ fn first_run_setup() -> Config {
 
     cfg
 }
-

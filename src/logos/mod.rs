@@ -131,11 +131,35 @@ pub fn display_name_for(name: &str) -> &'static str {
 /// the distros offered to the user, in selection order.
 pub fn known_distros() -> Vec<&'static str> {
     vec![
-        "arch", "debian", "ubuntu", "linuxmint", "kali", "raspbian",
-        "fedora", "rhel", "centos", "rocky", "almalinux",
-        "opensuse-tumbleweed", "opensuse-leap", "sles",
-        "gentoo", "void", "nixos", "pop", "elementary", "mageia",
-        "openmandriva", "lfs", "bedrock", "rfetch", "cachyos", "mist", "chimera", "haliade", "alpine",
+        "arch",
+        "debian",
+        "ubuntu",
+        "linuxmint",
+        "kali",
+        "raspbian",
+        "fedora",
+        "rhel",
+        "centos",
+        "rocky",
+        "almalinux",
+        "opensuse-tumbleweed",
+        "opensuse-leap",
+        "sles",
+        "gentoo",
+        "void",
+        "nixos",
+        "pop",
+        "elementary",
+        "mageia",
+        "openmandriva",
+        "lfs",
+        "bedrock",
+        "rfetch",
+        "cachyos",
+        "mist",
+        "chimera",
+        "haliade",
+        "alpine",
         "android",
     ]
 }
@@ -174,7 +198,10 @@ mod tests {
     fn every_known_distro_resolves() {
         let distros = known_distros();
         assert_eq!(distros.len(), 30, "expected exactly 30 known distros");
-        assert!(!distros.contains(&"unknown"), "unknown is a fallback, not a distro");
+        assert!(
+            !distros.contains(&"unknown"),
+            "unknown is a fallback, not a distro"
+        );
         for name in distros {
             assert!(
                 lookup(name).is_some(),

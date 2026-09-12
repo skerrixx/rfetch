@@ -130,7 +130,9 @@ fn print_json(s: &Stats) {
 }
 
 fn print_usage() {
-    eprintln!("usage: bench [--runs N] [--warmup N] [--bin PATH] [--compare PATH] [--json] [-- BIN_ARGS...]");
+    eprintln!(
+        "usage: bench [--runs N] [--warmup N] [--bin PATH] [--compare PATH] [--json] [-- BIN_ARGS...]"
+    );
 }
 
 fn main() {

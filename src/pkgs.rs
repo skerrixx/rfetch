@@ -1,7 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::process::Command;
 use std::thread;
-use std::time::{SystemTime, Duration};
-use serde::{Serialize, Deserialize};
+use std::time::{Duration, SystemTime};
 
 #[derive(Serialize, Deserialize)]
 struct PackageCache {
@@ -25,17 +25,13 @@ struct GpuCache {
 }
 
 fn count_packages(cmd: &str, args: &[&str]) -> Option<usize> {
-    Command::new(cmd)
-        .args(args)
-        .output()
-        .ok()
-        .and_then(|o| {
-            if !o.status.success() {
-                return None;
-            }
-            let count = String::from_utf8_lossy(&o.stdout).lines().count();
-            if count > 0 { Some(count) } else { None }
-        })
+    Command::new(cmd).args(args).output().ok().and_then(|o| {
+        if !o.status.success() {
+            return None;
+        }
+        let count = String::from_utf8_lossy(&o.stdout).lines().count();
+        if count > 0 { Some(count) } else { None }
+    })
 }
 
 fn binary_exists(cmd: &str) -> bool {
@@ -109,7 +105,10 @@ pub fn fetch_gpu() -> String {
         return g;
     }
     let g = crate::basic::gpu();
-    let cache = GpuCache { gpu: g.clone(), timestamp: SystemTime::now() };
+    let cache = GpuCache {
+        gpu: g.clone(),
+        timestamp: SystemTime::now(),
+    };
     let _ = std::fs::write(gpu_cache_path(), serde_json::to_string(&cache).unwrap());
     g
 }
@@ -151,7 +150,7 @@ fn get_installed_packages_parallel() -> String {
 
 fn format_package_string(cache: &PackageCache) -> String {
     let mut parts = Vec::new();
-    
+
     if let Some(count) = cache.debian {
         parts.push(format!("{} (deb  )", count));
     }

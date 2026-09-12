@@ -1,11 +1,11 @@
-use std::process::Command;
-use std::path::Path;
-use std::env;
-use std::collections::HashSet;
-use sysinfo::System;
-use whoami;
 use starship_battery::Manager;
 use starship_battery::units::ratio::percent;
+use std::collections::HashSet;
+use std::env;
+use std::path::Path;
+use std::process::Command;
+use sysinfo::System;
+use whoami;
 
 #[path = "logos/mod.rs"]
 mod logos;
@@ -38,11 +38,7 @@ fn os_id_or_name() -> String {
             for line in content.lines() {
                 if let Some(rest) = line.strip_prefix(&format!("{}=", key)) {
                     let v = rest.trim();
-                    return Some(
-                        v.trim_start_matches('"')
-                            .trim_end_matches('"')
-                            .to_string(),
-                    );
+                    return Some(v.trim_start_matches('"').trim_end_matches('"').to_string());
                 }
             }
             None
@@ -61,11 +57,7 @@ fn os_id_or_name() -> String {
             for line in content.lines() {
                 if let Some(rest) = line.strip_prefix(&format!("{}=", key)) {
                     let v = rest.trim();
-                    return Some(
-                        v.trim_start_matches('"')
-                            .trim_end_matches('"')
-                            .to_string(),
-                    );
+                    return Some(v.trim_start_matches('"').trim_end_matches('"').to_string());
                 }
             }
             None
@@ -74,13 +66,14 @@ fn os_id_or_name() -> String {
         extract_value(&content, "ID")
             .or_else(|| extract_value(&content, "NAME"))
             .unwrap_or_default()
-    }
-    else {
-        let os = String::from_utf8(Command::new("uname").arg("s").output().expect("").stdout).expect("").to_string().to_lowercase();
+    } else {
+        let os = String::from_utf8(Command::new("uname").arg("s").output().expect("").stdout)
+            .expect("")
+            .to_string()
+            .to_lowercase();
         return os;
     }
 }
-
 
 /// hot-path replacement for `sysinfo::System`.
 ///
@@ -119,11 +112,20 @@ impl Default for SystemInfo {
 
 fn read_meminfo() -> Option<(u64, u64, u64, u64)> {
     let content = std::fs::read_to_string("/proc/meminfo").ok()?;
-    let (mut total, mut available, mut free, mut buffers, mut cached) = (0u64, 0u64, 0u64, 0u64, 0u64);
+    let (mut total, mut available, mut free, mut buffers, mut cached) =
+        (0u64, 0u64, 0u64, 0u64, 0u64);
     let (mut swap_total, mut swap_free) = (0u64, 0u64);
     for line in content.lines() {
-        let Some((key, rest)) = line.split_once(':') else { continue };
-        let Some(value) = rest.split_whitespace().next().and_then(|v| v.parse::<u64>().ok()) else { continue };
+        let Some((key, rest)) = line.split_once(':') else {
+            continue;
+        };
+        let Some(value) = rest
+            .split_whitespace()
+            .next()
+            .and_then(|v| v.parse::<u64>().ok())
+        else {
+            continue;
+        };
         match key {
             "MemTotal" => total = value,
             "MemAvailable" => available = value,
@@ -146,7 +148,9 @@ fn read_cpu_brand() -> String {
         return String::new();
     };
     for line in content.lines() {
-        let Some((key, value)) = line.split_once(':') else { continue };
+        let Some((key, value)) = line.split_once(':') else {
+            continue;
+        };
         let value = value.trim();
         if value.is_empty() {
             continue;
@@ -166,7 +170,6 @@ pub fn cpu(info: &SystemInfo) -> String {
 pub fn raw_os_id_or_name() -> String {
     os_id_or_name()
 }
-
 
 pub fn os() -> String {
     logos::display_name_for(&os_id_or_name()).to_string()
@@ -194,9 +197,25 @@ pub struct DiskInfo {
 }
 
 const EXCLUDED_FS: &[&str] = &[
-    "tmpfs", "devtmpfs", "squashfs", "overlay", "proc", "sysfs", "cgroup",
-    "devpts", "hugetlbfs", "mqueue", "pstore", "securityfs", "efivarfs",
-    "bpf", "tracefs", "debugfs", "configfs", "fusectl", "autofs",
+    "tmpfs",
+    "devtmpfs",
+    "squashfs",
+    "overlay",
+    "proc",
+    "sysfs",
+    "cgroup",
+    "devpts",
+    "hugetlbfs",
+    "mqueue",
+    "pstore",
+    "securityfs",
+    "efivarfs",
+    "bpf",
+    "tracefs",
+    "debugfs",
+    "configfs",
+    "fusectl",
+    "autofs",
 ];
 
 /// `statvfs` reports the same block accounting `df` uses (`f_bfree`, not the
@@ -209,7 +228,11 @@ fn statvfs_sizes(path: &str) -> Option<(u64, u64)> {
     if unsafe { libc::statvfs(c.as_ptr(), &mut st) } != 0 {
         return None;
     }
-    let frsize = if st.f_frsize != 0 { st.f_frsize } else { st.f_bsize } as u64;
+    let frsize = if st.f_frsize != 0 {
+        st.f_frsize
+    } else {
+        st.f_bsize
+    } as u64;
     let total = (st.f_blocks as u64).checked_mul(frsize)?;
     let free = (st.f_bfree as u64).checked_mul(frsize)?;
     Some((total, total.checked_sub(free)?))
@@ -225,9 +248,18 @@ pub fn disks_info() -> Vec<DiskInfo> {
         let mut seen = HashSet::new();
         for line in mounts.lines() {
             let mut parts = line.split_whitespace();
-            let source = match parts.next() { Some(v) => v, None => continue };
-            let target = match parts.next() { Some(v) => v, None => continue };
-            let fstype = match parts.next() { Some(v) => v, None => continue };
+            let source = match parts.next() {
+                Some(v) => v,
+                None => continue,
+            };
+            let target = match parts.next() {
+                Some(v) => v,
+                None => continue,
+            };
+            let fstype = match parts.next() {
+                Some(v) => v,
+                None => continue,
+            };
 
             if !source.starts_with("/dev/") || target.starts_with("/boot") {
                 continue;
@@ -278,10 +310,25 @@ pub fn disks_info() -> Vec<DiskInfo> {
             continue;
         }
         let skip_fs: &[&str] = &[
-            "tmpfs", "devtmpfs", "squashfs", "overlay", "proc", "sysfs",
-            "cgroup", "devpts", "hugetlbfs", "mqueue", "pstore",
-            "securityfs", "efivarfs", "bpf", "tracefs", "debugfs",
-            "configfs", "autofs", "efiivarfs",
+            "tmpfs",
+            "devtmpfs",
+            "squashfs",
+            "overlay",
+            "proc",
+            "sysfs",
+            "cgroup",
+            "devpts",
+            "hugetlbfs",
+            "mqueue",
+            "pstore",
+            "securityfs",
+            "efivarfs",
+            "bpf",
+            "tracefs",
+            "debugfs",
+            "configfs",
+            "autofs",
+            "efiivarfs",
         ];
         if skip_fs.contains(&fs_name.as_ref()) {
             continue;
@@ -295,7 +342,11 @@ pub fn disks_info() -> Vec<DiskInfo> {
         let total = disk.total_space() as f64 / gb;
         let avail = disk.available_space() as f64 / gb;
         let used = total - avail;
-        let pct = if total > 0.0 { (used / total) * 100.0 } else { 0.0 };
+        let pct = if total > 0.0 {
+            (used / total) * 100.0
+        } else {
+            0.0
+        };
 
         let dev_name = disk.name().to_string_lossy().to_string();
         let name = if dev_name.starts_with('/') {
@@ -323,19 +374,19 @@ pub fn disks_info() -> Vec<DiskInfo> {
 }
 
 pub fn wmde() -> String {
-	let unp_de = env::var("XDG_CURRENT_DESKTOP").unwrap_or_else(|_| "rfetch".to_string());
-	match unp_de.to_lowercase().as_str() {
-		"gnome" => String::from(" gnome"),
-		"kde" | "plasma" => String::from(" kde"),
-		"niri" => String::from(" niri"),
-		"hyprland" => String::from(" hypr"),
-		"xfce" => String::from(" xfce"),
-		"sway" => String::from(" sway"),
-		"i3" => String::from(" i3"),
-		"mango" | "mangowm" => String::from("󱁆 mango"),
-		"cinnamon" | "x-cinnamon" => String::from(" cinnamon"),
-		_ => format!(" {}", unp_de.to_lowercase())
-	}
+    let unp_de = env::var("XDG_CURRENT_DESKTOP").unwrap_or_else(|_| "rfetch".to_string());
+    match unp_de.to_lowercase().as_str() {
+        "gnome" => String::from(" gnome"),
+        "kde" | "plasma" => String::from(" kde"),
+        "niri" => String::from(" niri"),
+        "hyprland" => String::from(" hypr"),
+        "xfce" => String::from(" xfce"),
+        "sway" => String::from(" sway"),
+        "i3" => String::from(" i3"),
+        "mango" | "mangowm" => String::from("󱁆 mango"),
+        "cinnamon" | "x-cinnamon" => String::from(" cinnamon"),
+        _ => format!(" {}", unp_de.to_lowercase()),
+    }
 }
 pub fn kernel() -> String {
     if is_termux() {
@@ -380,7 +431,7 @@ pub fn shell() -> String {
         "bash" => " bash".to_string(),
         "zsh" => " zsh".to_string(),
         "sh" => " sh".to_string(),
-        _ => " unknown".to_string()
+        _ => " unknown".to_string(),
     }
 }
 
@@ -409,8 +460,8 @@ pub fn terminal() -> String {
             "foot" => " foot".to_string(),
             "xterm-256color" => " DE terminal".to_string(),
             "xterm-ghostty" => "󰊠 ghostty".to_string(),
-            _ => format!(" {}", unp_t.to_lowercase())
-        }
+            _ => format!(" {}", unp_t.to_lowercase()),
+        };
     }
 
     String::new()
@@ -436,7 +487,10 @@ pub fn gpu() -> String {
 fn read_hex(path: &str) -> Option<u32> {
     let s = std::fs::read_to_string(path).ok()?;
     let s = s.trim();
-    let s = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")).unwrap_or(s);
+    let s = s
+        .strip_prefix("0x")
+        .or_else(|| s.strip_prefix("0X"))
+        .unwrap_or(s);
     u32::from_str_radix(s, 16).ok()
 }
 
@@ -470,7 +524,10 @@ fn amdgpu_name(device_id: u32, revision_id: u32) -> Option<String> {
 }
 
 fn nvidia_name() -> Option<String> {
-    for e in std::fs::read_dir("/proc/driver/nvidia/gpus").ok()?.flatten() {
+    for e in std::fs::read_dir("/proc/driver/nvidia/gpus")
+        .ok()?
+        .flatten()
+    {
         let info = match std::fs::read_to_string(e.path().join("information")) {
             Ok(i) => i,
             Err(_) => continue,
@@ -506,9 +563,10 @@ fn gpu_from_sysfs() -> Option<String> {
         let dev = format!("/sys/class/drm/{}/device", name);
         match read_hex(&format!("{}/vendor", dev)) {
             Some(0x1002) if amd.is_none() => {
-                if let (Some(did), Some(rid)) =
-                    (read_hex(&format!("{}/device", dev)), read_hex(&format!("{}/revision", dev)))
-                {
+                if let (Some(did), Some(rid)) = (
+                    read_hex(&format!("{}/device", dev)),
+                    read_hex(&format!("{}/revision", dev)),
+                ) {
                     // fall back to libdrm's default when the id table misses
                     amd = amdgpu_name(did, rid).or_else(|| Some("AMD Radeon Graphics".to_string()));
                 }
@@ -544,16 +602,27 @@ pub fn uptime() -> String {
                 parts.push(format!("{} day{}", days, if days == 1 { "" } else { "s" }));
             }
             if hours > 0 {
-                parts.push(format!("{} hour{}", hours, if hours == 1 { "" } else { "s" }));
+                parts.push(format!(
+                    "{} hour{}",
+                    hours,
+                    if hours == 1 { "" } else { "s" }
+                ));
             }
             if mins > 0 || parts.is_empty() {
-                parts.push(format!("{} minute{}", mins, if mins == 1 { "" } else { "s" }));
+                parts.push(format!(
+                    "{} minute{}",
+                    mins,
+                    if mins == 1 { "" } else { "s" }
+                ));
             }
             Some(parts.join(", "))
         })
         .unwrap_or_else(|| {
             let output = Command::new("uptime").arg("-p").output().expect("");
-            String::from_utf8_lossy(&output.stdout).trim().to_string().replace("up ", "")
+            String::from_utf8_lossy(&output.stdout)
+                .trim()
+                .to_string()
+                .replace("up ", "")
         })
 }
 
@@ -625,7 +694,12 @@ fn modified_time_of(path: &str) -> Option<SystemTime> {
 
 fn stat_birth_fallback(path: &str) -> Option<SystemTime> {
     // `stat -c %W` prints birth as unix secs, 0 if unknown.
-    let out = Command::new("stat").arg("-c").arg("%W").arg(path).output().ok()?;
+    let out = Command::new("stat")
+        .arg("-c")
+        .arg("%W")
+        .arg(path)
+        .output()
+        .ok()?;
     if !out.status.success() {
         return None;
     }
@@ -746,7 +820,11 @@ fn format_age_duration(secs: u64) -> String {
     let y_word = if years == 1 { "year" } else { "years" };
     let mut s = format!("{} {}", years, y_word);
     if months > 0 {
-        s.push_str(&format!(" {} {}", months, if months == 1 { "month" } else { "months" }));
+        s.push_str(&format!(
+            " {} {}",
+            months,
+            if months == 1 { "month" } else { "months" }
+        ));
     }
     if d > 0 {
         s.push_str(&format!(" {} {}", d, if d == 1 { "day" } else { "days" }));
@@ -973,4 +1051,3 @@ pub fn boot_time() -> String {
     }
     "unknown".to_string()
 }
-
