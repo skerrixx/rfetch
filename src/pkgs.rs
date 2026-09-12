@@ -1,7 +1,11 @@
+use std::io::Write;
+use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::thread;
-use std::time::{SystemTime, Duration};
-use serde::{Serialize, Deserialize};
+use std::time::{Duration, SystemTime};
+
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 struct PackageCache {
@@ -25,17 +29,48 @@ struct GpuCache {
 }
 
 fn count_packages(cmd: &str, args: &[&str]) -> Option<usize> {
-    Command::new(cmd)
-        .args(args)
-        .output()
-        .ok()
-        .and_then(|o| {
-            if !o.status.success() {
-                return None;
-            }
-            let count = String::from_utf8_lossy(&o.stdout).lines().count();
-            if count > 0 { Some(count) } else { None }
-        })
+    let out = Command::new(cmd).args(args).output().ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let count = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter(|line| !is_header_line(cmd, line))
+        .count();
+    if count > 0 { Some(count) } else { None }
+}
+
+// Blank lines never count. Additionally, dnf and zypper print banner/column
+// rows before their package lists; those are dropped per manager. Managers
+// with clean output (pacman, apk, dpkg, ...) are untouched.
+fn is_header_line(cmd: &str, line: &str) -> bool {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return true;
+    }
+    match cmd {
+        "dnf" => is_dnf_header(trimmed),
+        "zypper" => is_zypper_header(trimmed),
+        _ => false,
+    }
+}
+
+fn is_dnf_header(line: &str) -> bool {
+    line.eq_ignore_ascii_case("Installed Packages") || {
+        let mut words = line.split_whitespace();
+        matches!(
+            (words.next(), words.next()),
+            (Some("Name"), Some("Version"))
+        )
+    }
+}
+
+fn is_zypper_header(line: &str) -> bool {
+    line.starts_with("Loading repository data")
+        || line.starts_with("Reading installed packages")
+        || (line.starts_with("S ") && line.contains("Name"))
+        || line.starts_with("--+")
+        || line.starts_with("---+")
 }
 
 fn binary_exists(cmd: &str) -> bool {
@@ -66,15 +101,56 @@ fn count_if_present(cmd: &str, args: &[&str]) -> Option<usize> {
     count_packages(cmd, args)
 }
 
-fn cache_path() -> String {
-    match std::env::var("TMPDIR") {
-        Ok(tmpdir) if !tmpdir.trim().is_empty() => format!("{}/rfetch_packages.json", tmpdir),
-        _ => "/tmp/rfetch_packages.json".to_string(),
+// Per-user, private cache directory so counts never leak across accounts and
+// the paths are not guessable by other users. Created 0700; files are written
+// 0600 with O_NOFOLLOW so a planted symlink can never be followed. Any failure
+// degrades to "no cache" rather than panicking.
+fn cache_dir() -> Option<PathBuf> {
+    let xdg = std::env::var("XDG_CACHE_HOME").ok();
+    let home = std::env::var("HOME").ok();
+    // SAFETY: getuid(2) has no preconditions and cannot fail.
+    let uid = unsafe { libc::getuid() };
+    let dir = resolve_cache_base(xdg.as_deref(), home.as_deref(), uid).join("rfetch");
+    if std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(&dir)
+        .is_err()
+    {
+        return None;
+    }
+    match std::fs::symlink_metadata(&dir) {
+        Ok(meta) if meta.file_type().is_symlink() => None,
+        Ok(_) => Some(dir),
+        Err(_) => None,
     }
 }
 
+fn resolve_cache_base(xdg: Option<&str>, home: Option<&str>, uid: u32) -> PathBuf {
+    match xdg.map(str::trim).filter(|v| !v.is_empty()) {
+        Some(xdg) => PathBuf::from(xdg),
+        None => match home.map(str::trim).filter(|v| !v.is_empty()) {
+            Some(home) => PathBuf::from(home).join(".cache"),
+            None => PathBuf::from(format!("/tmp/rfetch-{uid}")),
+        },
+    }
+}
+
+fn cache_path() -> Option<PathBuf> {
+    cache_dir().map(|dir| dir.join("rfetch_packages.json"))
+}
+
+fn write_cache_file(path: &Path, data: &str) {
+    let mut options = std::fs::OpenOptions::new();
+    options.create(true).write(true).truncate(true).mode(0o600);
+    options.custom_flags(libc::O_NOFOLLOW);
+    let _ = options
+        .open(path)
+        .and_then(|mut file| file.write_all(data.as_bytes()));
+}
+
 fn read_fresh_cache() -> Option<PackageCache> {
-    let data = std::fs::read_to_string(cache_path()).ok()?;
+    let data = std::fs::read_to_string(cache_path()?).ok()?;
     let cache: PackageCache = serde_json::from_str(&data).ok()?;
     if cache.timestamp.elapsed().unwrap_or_default() < Duration::from_secs(3600) {
         Some(cache)
@@ -83,19 +159,16 @@ fn read_fresh_cache() -> Option<PackageCache> {
     }
 }
 
-fn gpu_cache_path() -> String {
-    match std::env::var("TMPDIR") {
-        Ok(tmpdir) if !tmpdir.trim().is_empty() => format!("{}/rfetch_gpu.json", tmpdir),
-        _ => "/tmp/rfetch_gpu.json".to_string(),
-    }
+fn gpu_cache_path() -> Option<PathBuf> {
+    cache_dir().map(|dir| dir.join("rfetch_gpu.json"))
 }
 
 pub fn cached_gpu() -> Option<String> {
-    // GPU string lives in its own cache file so it stays warm even when
-    // "packages" is hidden. Previously both shared one file written only by
+    // gpu string lives in its own cache file so it stays warm even when
+    // "packages" is hidden. previously both shared one file written only by
     // getform(), so hiding packages starved this fast path: cached_gpu()
-    // missed forever and every run paid a full DRM probe (~20ms).
-    let data = std::fs::read_to_string(gpu_cache_path()).ok()?;
+    // missed forever and every run paid a full drm probe (~20ms).
+    let data = std::fs::read_to_string(gpu_cache_path()?).ok()?;
     let cache: GpuCache = serde_json::from_str(&data).ok()?;
     if cache.timestamp.elapsed().unwrap_or_default() < Duration::from_secs(3600) {
         Some(cache.gpu)
@@ -109,8 +182,13 @@ pub fn fetch_gpu() -> String {
         return g;
     }
     let g = crate::basic::gpu();
-    let cache = GpuCache { gpu: g.clone(), timestamp: SystemTime::now() };
-    let _ = std::fs::write(gpu_cache_path(), serde_json::to_string(&cache).unwrap());
+    let cache = GpuCache {
+        gpu: g.clone(),
+        timestamp: SystemTime::now(),
+    };
+    if let (Some(path), Ok(json)) = (gpu_cache_path(), serde_json::to_string(&cache)) {
+        write_cache_file(&path, &json);
+    }
     g
 }
 
@@ -144,14 +222,16 @@ fn get_installed_packages_parallel() -> String {
         timestamp: SystemTime::now(),
     };
 
-    let _ = std::fs::write(cache_path(), serde_json::to_string(&cache).unwrap());
+    if let (Some(path), Ok(json)) = (cache_path(), serde_json::to_string(&cache)) {
+        write_cache_file(&path, &json);
+    }
 
     format_package_string(&cache)
 }
 
 fn format_package_string(cache: &PackageCache) -> String {
     let mut parts = Vec::new();
-    
+
     if let Some(count) = cache.debian {
         parts.push(format!("{} (deb  )", count));
     }
@@ -176,6 +256,9 @@ fn format_package_string(cache: &PackageCache) -> String {
     if let Some(count) = cache.suse {
         parts.push(format!("{} (suse  )", count));
     }
+    if let Some(count) = cache.netbsd {
+        parts.push(format!("{} (netbsd \u{f0240} )", count));
+    }
     if let Some(count) = cache.termux {
         parts.push(format!("{} (termux  )", count));
     }
@@ -183,15 +266,146 @@ fn format_package_string(cache: &PackageCache) -> String {
     if parts.is_empty() {
         "none found".to_string()
     } else {
-        format!("{}", parts.join(", "))
+        parts.join(", ")
     }
 }
 
 pub fn clear_cache() {
-    let _ = std::fs::remove_file(cache_path());
-    let _ = std::fs::remove_file(gpu_cache_path());
+    if let Some(path) = cache_path() {
+        let _ = std::fs::remove_file(path);
+    }
+    if let Some(path) = gpu_cache_path() {
+        let _ = std::fs::remove_file(path);
+    }
 }
 
 pub fn getform() -> String {
     get_installed_packages_parallel()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn empty_cache() -> PackageCache {
+        PackageCache {
+            debian: None,
+            arch: None,
+            redhat: None,
+            void: None,
+            gentoo: None,
+            alpine: None,
+            flatpak: None,
+            suse: None,
+            netbsd: None,
+            termux: None,
+            timestamp: SystemTime::UNIX_EPOCH,
+        }
+    }
+
+    #[test]
+    fn format_package_string_is_none_found_when_everything_is_empty() {
+        assert_eq!(format_package_string(&empty_cache()), "none found");
+    }
+
+    #[test]
+    fn format_package_string_includes_every_populated_manager() {
+        let cache = PackageCache {
+            debian: Some(1),
+            arch: Some(2),
+            redhat: Some(3),
+            void: Some(4),
+            gentoo: Some(5),
+            alpine: Some(6),
+            flatpak: Some(7),
+            suse: Some(8),
+            netbsd: Some(9),
+            termux: Some(10),
+            timestamp: SystemTime::UNIX_EPOCH,
+        };
+        let out = format_package_string(&cache);
+        assert!(out.contains("1 (deb"));
+        assert!(out.contains("2 (arch"));
+        assert!(out.contains("3 (dnf"));
+        assert!(out.contains("4 (void"));
+        assert!(out.contains("5 (gent"));
+        assert!(out.contains("6 (alpine"));
+        assert!(out.contains("7 (flatpak"));
+        assert!(out.contains("8 (suse"));
+        assert!(out.contains("9 (netbsd"));
+        assert!(out.contains("10 (termux"));
+        assert_eq!(out.matches(", ").count(), 9);
+    }
+
+    #[test]
+    fn format_package_string_shows_netbsd_when_populated() {
+        let cache = PackageCache {
+            netbsd: Some(42),
+            ..empty_cache()
+        };
+        assert!(format_package_string(&cache).contains("42 (netbsd"));
+    }
+
+    #[test]
+    fn resolve_cache_base_prefers_xdg() {
+        assert_eq!(
+            resolve_cache_base(Some("/x"), Some("/h"), 1000),
+            PathBuf::from("/x")
+        );
+    }
+
+    #[test]
+    fn resolve_cache_base_falls_back_to_home_dot_cache() {
+        assert_eq!(
+            resolve_cache_base(None, Some("/h"), 1000),
+            PathBuf::from("/h/.cache")
+        );
+    }
+
+    #[test]
+    fn resolve_cache_base_falls_back_to_uid_tmpdir_and_ignores_blank_values() {
+        assert_eq!(
+            resolve_cache_base(None, None, 1000),
+            PathBuf::from("/tmp/rfetch-1000")
+        );
+        assert_eq!(
+            resolve_cache_base(Some("  "), Some("  "), 7),
+            PathBuf::from("/tmp/rfetch-7")
+        );
+    }
+
+    #[test]
+    fn dnf_headers_are_filtered() {
+        assert!(is_dnf_header("Installed Packages"));
+        assert!(is_dnf_header("installed packages"));
+        assert!(is_dnf_header("Name    Version    Repository"));
+        assert!(!is_dnf_header(
+            "NetworkManager.x86_64  1:1.46.0-2.fc40  @System"
+        ));
+    }
+
+    #[test]
+    fn zypper_headers_are_filtered() {
+        assert!(is_zypper_header("Loading repository data..."));
+        assert!(is_zypper_header("Reading installed packages..."));
+        assert!(is_zypper_header("S | Name | Summary | Type"));
+        assert!(is_zypper_header("---+------+---------+-----"));
+        assert!(!is_zypper_header("i | Mesa | 3-D graphics | package"));
+    }
+
+    #[test]
+    fn header_filtering_keeps_clean_managers_untouched() {
+        assert!(!is_header_line("pacman", "linux 6.10.1-arch1-1"));
+        assert!(!is_header_line("dpkg", "vim\tinstall"));
+        assert!(!is_header_line(
+            "dnf",
+            "vim-enhanced.x86_64  2:9.1.719-1.fc40  @updates"
+        ));
+        assert!(!is_header_line(
+            "zypper",
+            "i+ | vim | Vi IMproved | package"
+        ));
+        assert!(is_header_line("pacman", ""));
+        assert!(is_header_line("pacman", "   "));
+    }
 }

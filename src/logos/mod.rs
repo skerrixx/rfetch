@@ -1,8 +1,8 @@
-//! Distro logo registry.
+//! distro logo registry.
 //!
-//! Every distro logo lives in its own submodule (`src/logos/<id>.rs`) as a
-//! `pub const LOGO: Logo`. This module owns the registry (`LOGOS`) and the
-//! lookup API used by the rest of the program.
+//! every distro logo lives in its own submodule (`src/logos/<id>.rs`) as a
+//! `pub const LOGO: Logo`. this module owns the registry (`LOGOS`) and the
+//! lookup api used by the rest of the program.
 
 pub mod alma;
 pub mod alpine;
@@ -43,7 +43,7 @@ pub mod ubuntu;
 pub mod unknown;
 pub mod void;
 
-/// A single distro logo: identity, search aliases, display label, ASCII art
+/// a single distro logo: identity, search aliases, display label, ascii art
 /// and the accent color used when coloring the art.
 pub struct Logo {
     pub id: &'static str,
@@ -53,10 +53,10 @@ pub struct Logo {
     pub color: (u8, u8, u8),
 }
 
-/// Every known distro logo, in display/selection order.
+/// every known distro logo, in display/selection order.
 ///
 /// `unknown` is deliberately excluded: it is the fallback only.
-/// The three openSUSE variants share one `opensuse` art constant.
+/// the three opensuse variants share one `opensuse` art constant.
 pub static LOGOS: &[&Logo] = &[
     &arch::LOGO,
     &artix::LOGO,
@@ -99,43 +99,67 @@ pub static LOGOS: &[&Logo] = &[
     &android::LOGO,
 ];
 
-/// Trim surrounding whitespace and lowercase a user-supplied distro name.
+/// trim surrounding whitespace and lowercase a user-supplied distro name.
 fn normalize(name: &str) -> String {
     name.trim().to_lowercase()
 }
 
-/// Resolve a name to a logo by matching its id or any of its aliases.
+/// resolve a name to a logo by matching its id or any of its aliases.
 fn lookup(name: &str) -> Option<&'static Logo> {
     let v = normalize(name);
     LOGOS
         .iter()
         .copied()
-        .find(|logo| logo.id == v.as_str() || logo.aliases.iter().any(|alias| *alias == v.as_str()))
+        .find(|logo| logo.id == v.as_str() || logo.aliases.contains(&v.as_str()))
 }
 
-/// ASCII art for `name`, falling back to the generic Tux art.
+/// ascii art for `name`, falling back to the generic tux art.
 pub fn get_ascii_art(name: &str) -> &'static str {
     lookup(name).map_or(unknown::LOGO.art, |logo| logo.art)
 }
 
-/// Accent color for `name`, falling back to white.
+/// accent color for `name`, falling back to white.
 pub fn get_logo_color(name: &str) -> (u8, u8, u8) {
     lookup(name).map_or((255, 255, 255), |logo| logo.color)
 }
 
-/// Display label for `name`, falling back to the generic unknown label.
+/// display label for `name`, falling back to the generic unknown label.
 pub fn display_name_for(name: &str) -> &'static str {
     lookup(name).map_or(unknown::LOGO.display_name, |logo| logo.display_name)
 }
 
-/// The distros offered to the user, in selection order.
+/// the distros offered to the user, in selection order.
 pub fn known_distros() -> Vec<&'static str> {
     vec![
-        "arch", "debian", "ubuntu", "linuxmint", "kali", "raspbian",
-        "fedora", "rhel", "centos", "rocky", "almalinux",
-        "opensuse-tumbleweed", "opensuse-leap", "sles",
-        "gentoo", "void", "nixos", "pop", "elementary", "mageia",
-        "openmandriva", "lfs", "bedrock", "rfetch", "cachyos", "mist", "chimera", "haliade", "alpine",
+        "arch",
+        "debian",
+        "ubuntu",
+        "linuxmint",
+        "kali",
+        "raspbian",
+        "fedora",
+        "rhel",
+        "centos",
+        "rocky",
+        "almalinux",
+        "opensuse-tumbleweed",
+        "opensuse-leap",
+        "sles",
+        "gentoo",
+        "void",
+        "nixos",
+        "pop",
+        "elementary",
+        "mageia",
+        "openmandriva",
+        "lfs",
+        "bedrock",
+        "rfetch",
+        "cachyos",
+        "mist",
+        "chimera",
+        "haliade",
+        "alpine",
         "android",
     ]
 }
@@ -174,7 +198,10 @@ mod tests {
     fn every_known_distro_resolves() {
         let distros = known_distros();
         assert_eq!(distros.len(), 30, "expected exactly 30 known distros");
-        assert!(!distros.contains(&"unknown"), "unknown is a fallback, not a distro");
+        assert!(
+            !distros.contains(&"unknown"),
+            "unknown is a fallback, not a distro"
+        );
         for name in distros {
             assert!(
                 lookup(name).is_some(),

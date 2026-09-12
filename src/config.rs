@@ -1,38 +1,83 @@
+use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use colored::Colorize;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum AsciiColorMode {
-	Enabled(bool),
-	Color(String),
+    Enabled(bool),
+    Color(String),
 }
 
 impl Default for AsciiColorMode {
-	fn default() -> Self {
-		AsciiColorMode::Enabled(true)
-	}
+    fn default() -> Self {
+        AsciiColorMode::Enabled(true)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
-    #[serde(default = "defacolor")]
+    #[serde(default = "defacolor", deserialize_with = "deserialize_ascii_color")]
     pub color_ascii: AsciiColorMode,
     #[serde(default = "deficolor")]
     pub color_infotext: String,
     #[serde(default = "defhide")]
     pub hide_info: Vec<String>,
-	#[serde(default = "defstyle")]
-	pub style: String,
-	#[serde(default)]
-	pub anonymize: bool,
-	#[serde(default)]
-	pub ascii_path: Option<String>,
+    #[serde(default = "defstyle")]
+    pub style: String,
+    #[serde(default)]
+    pub anonymize: bool,
+    #[serde(default)]
+    pub ascii_path: Option<String>,
 }
 
 fn defacolor() -> AsciiColorMode {
     AsciiColorMode::Enabled(true)
+}
+
+// Accepts bool (enabled/disabled), string (color name), or number. A numeric
+// value is tolerated as a color name string so a stray number in conf.jsonc
+// can no longer break the entire config parse; unknown names simply render
+// uncolored at the call site, same as unknown string values.
+fn deserialize_ascii_color<'de, D>(deserializer: D) -> Result<AsciiColorMode, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct AsciiColorVisitor;
+
+    impl<'de> serde::de::Visitor<'de> for AsciiColorVisitor {
+        type Value = AsciiColorMode;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a boolean, string, or number")
+        }
+
+        fn visit_bool<E>(self, value: bool) -> Result<AsciiColorMode, E> {
+            Ok(AsciiColorMode::Enabled(value))
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<AsciiColorMode, E> {
+            Ok(AsciiColorMode::Color(value.to_string()))
+        }
+
+        fn visit_string<E>(self, value: String) -> Result<AsciiColorMode, E> {
+            Ok(AsciiColorMode::Color(value))
+        }
+
+        fn visit_u64<E>(self, value: u64) -> Result<AsciiColorMode, E> {
+            Ok(AsciiColorMode::Color(value.to_string()))
+        }
+
+        fn visit_i64<E>(self, value: i64) -> Result<AsciiColorMode, E> {
+            Ok(AsciiColorMode::Color(value.to_string()))
+        }
+
+        fn visit_f64<E>(self, value: f64) -> Result<AsciiColorMode, E> {
+            Ok(AsciiColorMode::Color(value.to_string()))
+        }
+    }
+
+    deserializer.deserialize_any(AsciiColorVisitor)
 }
 
 fn deficolor() -> String {
@@ -53,9 +98,9 @@ impl Default for Config {
             color_ascii: defacolor(),
             color_infotext: deficolor(),
             hide_info: defhide(),
-			style: defstyle(),
-			anonymize: false,
-			ascii_path: None,
+            style: defstyle(),
+            anonymize: false,
+            ascii_path: None,
         }
     }
 }
@@ -119,11 +164,50 @@ fn strip_comments(input: &str) -> String {
                 chars.next();
                 in_block_comment = true;
             }
+            ',' => {
+                // JSONC: drop a trailing comma only when the next meaningful
+                // token (ignoring whitespace and comments) is `}` or `]`.
+                let mut ahead = chars.clone();
+                if !trailing_comma_ahead(&mut ahead) {
+                    out.push(c);
+                }
+            }
             _ => out.push(c),
         }
     }
 
     out
+}
+
+/// Returns true when the next non-whitespace, non-comment token is `}` or `]`.
+/// Does not consume the main stream: the caller passes a cloned lookahead.
+fn trailing_comma_ahead(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> bool {
+    loop {
+        match chars.next() {
+            Some(c) if c.is_whitespace() => continue,
+            Some('}') | Some(']') => return true,
+            Some('/') => match chars.next() {
+                Some('/') => {
+                    for c in chars.by_ref() {
+                        if c == '\n' {
+                            break;
+                        }
+                    }
+                }
+                Some('*') => {
+                    let mut prev = None;
+                    for c in chars.by_ref() {
+                        if prev == Some('*') && c == '/' {
+                            break;
+                        }
+                        prev = Some(c);
+                    }
+                }
+                _ => return false,
+            },
+            _ => return false,
+        }
+    }
 }
 
 fn default_config_content() -> String {
@@ -164,22 +248,25 @@ pub fn load_config() -> Config {
 }
 
 fn first_run_setup() -> Config {
-    println!("welcome!");
-    println!("{}{}{}{}","it seems it's your ", "first".red(), " time using ", "rfetch!".blue());
-    println!(
+    eprintln!("welcome!");
+    eprintln!(
+        "it seems it's your {} time using {}",
+        "first".red(),
+        "rfetch!".blue()
+    );
+    eprintln!(
         "\nwe haven't found a rfetch configuration file found at {}.",
         config_path().display()
     );
-    println!("\ncreating a default config - screenshot-ready, no setup needed!");
-    println!("tip: edit ~/.config/rfetch/conf.jsonc anytime to customize rfetch.\n");
+    eprintln!("\ncreating a default config - screenshot-ready, no setup needed!");
+    eprintln!("tip: edit ~/.config/rfetch/conf.jsonc anytime to customize rfetch.\n");
     let cfg = Config::default();
 
     if let Some(parent) = config_path().parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
-            println!(
-                "{}{}{}{}",
+            eprintln!(
+                "{}: could not create {} ({})",
                 "error".red(),
-                ": could not create {} ({})",
                 parent.display(),
                 e
             );
@@ -187,10 +274,13 @@ fn first_run_setup() -> Config {
         }
     }
 
-    match std::fs::write(&config_path(), default_config_content()) {
+    match std::fs::write(config_path(), default_config_content()) {
         Ok(_) => {
             eprintln!();
-            eprintln!("your config is created! it's located at {}.", config_path().display());
+            eprintln!(
+                "your config is created! it's located at {}.",
+                config_path().display()
+            );
             eprintln!("you can edit it anytime to customize rfetch.");
         }
         Err(e) => {
@@ -206,3 +296,90 @@ fn first_run_setup() -> Config {
     cfg
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strip_comments_removes_line_comments() {
+        let input = "{\n  \"a\": 1 // line comment\n}";
+        assert_eq!(strip_comments(input), "{\n  \"a\": 1 \n}");
+    }
+
+    #[test]
+    fn strip_comments_removes_block_comments() {
+        let input = "{ /* block */ \"a\": 1 }";
+        assert_eq!(strip_comments(input), "{  \"a\": 1 }");
+    }
+
+    #[test]
+    fn strip_comments_removes_inline_trailing_comments() {
+        let input = "{\n  \"a\": 1, // trailing comment\n}";
+        assert_eq!(strip_comments(input), "{\n  \"a\": 1 \n}");
+    }
+
+    #[test]
+    fn strip_comments_removes_trailing_commas_in_object_and_array() {
+        let input = "{\"a\": 1, \"b\": [1, 2, 3,],}";
+        assert_eq!(strip_comments(input), "{\"a\": 1, \"b\": [1, 2, 3]}");
+    }
+
+    #[test]
+    fn strip_comments_removes_multiline_trailing_commas() {
+        let input = "{\n  \"hide_info\": [\n    \"packages\",\n    \"uptime\",\n  ],\n}";
+        assert_eq!(
+            strip_comments(input),
+            "{\n  \"hide_info\": [\n    \"packages\",\n    \"uptime\"\n  ]\n}"
+        );
+    }
+
+    #[test]
+    fn strip_comments_keeps_comment_like_string_content_verbatim() {
+        let input = r#"{"a": "x//y", "b": "/*c*/", "c": "a,b,}", "d": "q\"w", "e": "back\\slash"}"#;
+        assert_eq!(strip_comments(input), input);
+    }
+
+    #[test]
+    fn jsonc_with_comments_and_trailing_commas_deserializes_to_config() {
+        let jsonc = r#"{
+            "color_ascii": "infotext", // comment
+            "color_infotext": "white",
+            "hide_info": [
+                "packages", /* block comment */
+                "uptime",
+            ],
+            "style": "boxed",
+            "anonymize": false,
+            "ascii_path": null,
+        }"#;
+        let cfg: Config = serde_json::from_str(&strip_comments(jsonc)).expect("jsonc should parse");
+        assert!(matches!(cfg.color_ascii, AsciiColorMode::Color(ref s) if s == "infotext"));
+        assert_eq!(cfg.color_infotext, "white");
+        assert_eq!(cfg.hide_info, vec!["packages", "uptime"]);
+        assert_eq!(cfg.style, "boxed");
+        assert!(!cfg.anonymize);
+        assert_eq!(cfg.ascii_path, None);
+    }
+
+    #[test]
+    fn color_ascii_bool_still_parses_as_enabled() {
+        let cfg: Config =
+            serde_json::from_str(r#"{"color_ascii": false}"#).expect("bool should parse");
+        assert!(matches!(cfg.color_ascii, AsciiColorMode::Enabled(false)));
+    }
+
+    #[test]
+    fn color_ascii_string_still_parses_as_color() {
+        let cfg: Config =
+            serde_json::from_str(r#"{"color_ascii": "red"}"#).expect("string should parse");
+        assert!(matches!(cfg.color_ascii, AsciiColorMode::Color(ref s) if s == "red"));
+    }
+
+    #[test]
+    fn numeric_color_ascii_no_longer_breaks_parse() {
+        let cfg: Config = serde_json::from_str(r#"{"color_ascii": 123}"#)
+            .expect("numeric color_ascii should not break the whole config");
+        assert!(matches!(cfg.color_ascii, AsciiColorMode::Color(ref s) if s == "123"));
+        assert_eq!(cfg.color_infotext, "white");
+    }
+}
