@@ -1,4 +1,4 @@
-use colored::Colorize;
+use crate::internals::color::Colorize;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 

@@ -1,7 +1,8 @@
 mod basic;
 mod config;
+mod internals;
 mod pkgs;
-use colored::Colorize;
+use internals::color::Colorize;
 use pkgs::getform;
 use std::collections::HashSet;
 use std::env;
@@ -129,11 +130,15 @@ fn colorize_ascii_line(line: &str, distro_key: &str, cfg: &config::Config) -> St
 }
 
 fn random() {
-    let chosen: isize = rand::random_range(1..7) as isize;
+    let chosen = internals::random::random_range(1, 7);
     match chosen {
         1 => {
             let desktop = env::var("XDG_CURRENT_DESKTOP").unwrap_or_else(|_| "rfetch".to_string());
-            println!("\"i use {} btw\" - (c) {}", desktop, whoami::username())
+            println!(
+                "\"i use {} btw\" - (c) {}",
+                desktop,
+                internals::identity::username()
+            )
         }
         2 => {
             if Command::new("neofetch").arg("--version").output().is_ok() {
@@ -147,7 +152,7 @@ fn random() {
             }
         }
         3 => {
-            println!("{}@pc ~ > paru -S opsec", whoami::username());
+            println!("{}@pc ~ > paru -S opsec", internals::identity::username());
             println!("[paru] error: package opsec isn't found. did you mean rfetch?")
         }
         4 => {
@@ -167,13 +172,13 @@ fn random() {
             ];
             println!(
                 "fun fact about rfetch: {}",
-                facts[rand::random_range(0..facts.len())]
+                facts[internals::random::random_range(0, facts.len())]
             );
         }
         6 => {
             println!(
                 "{} is not in the rfetchers file. use virfetch to add yourself",
-                whoami::username()
+                internals::identity::username()
             )
         }
         _ => {
@@ -507,8 +512,8 @@ fn main() {
         } else {
             format!(
                 "{}@{}",
-                whoami::username(),
-                whoami::fallible::hostname().unwrap_or_default()
+                internals::identity::username(),
+                internals::identity::hostname()
             )
         };
         let mut parts: Vec<String> = vec![user_host];
@@ -735,12 +740,12 @@ fn main() {
         let user_name = if anonymize {
             "anonymous".to_string()
         } else {
-            whoami::username()
+            internals::identity::username()
         };
         let hostname = if anonymize {
             "hidden".to_string()
         } else {
-            whoami::fallible::hostname().unwrap_or_default()
+            internals::identity::hostname()
         };
         let mut obj = serde_json::Map::new();
         obj.insert(

@@ -1,10 +1,8 @@
-use starship_battery::Manager;
-use starship_battery::units::ratio::percent;
+use crate::internals::identity;
 use std::collections::HashSet;
 use std::env;
 use std::path::Path;
 use std::process::Command;
-use sysinfo::System;
 
 #[path = "logos/mod.rs"]
 mod logos;
@@ -307,74 +305,6 @@ pub fn disks_info() -> Vec<DiskInfo> {
         }
     }
 
-    let disks = sysinfo::Disks::new_with_refreshed_list();
-    let mut seen = HashSet::new();
-    for disk in disks.list() {
-        let fs_name = disk.file_system().to_string_lossy();
-        if fs_name == "fuse" || fs_name.starts_with("fuse.") {
-            continue;
-        }
-        if fs_name == "fusectl" {
-            continue;
-        }
-        let skip_fs: &[&str] = &[
-            "tmpfs",
-            "devtmpfs",
-            "squashfs",
-            "overlay",
-            "proc",
-            "sysfs",
-            "cgroup",
-            "cgroup2",
-            "devpts",
-            "hugetlbfs",
-            "mqueue",
-            "pstore",
-            "securityfs",
-            "efivarfs",
-            "bpf",
-            "tracefs",
-            "debugfs",
-            "configfs",
-            "autofs",
-            "ramfs",
-            "efiivarfs",
-        ];
-        if skip_fs.contains(&fs_name.as_ref()) {
-            continue;
-        }
-
-        let total = disk.total_space() as f64 / gb;
-        let avail = disk.available_space() as f64 / gb;
-        let used = total - avail;
-        let pct = if total > 0.0 {
-            (used / total) * 100.0
-        } else {
-            0.0
-        };
-
-        let dev_name = disk.name().to_string_lossy().to_string();
-        let name = if dev_name.starts_with('/') {
-            dev_name.strip_prefix("/dev/").unwrap_or(&dev_name)
-        } else {
-            &dev_name
-        };
-
-        let fstype = disk.file_system().to_string_lossy().to_string();
-
-        let dev_name = name.to_string();
-        if !seen.insert(dev_name.clone()) {
-            continue;
-        }
-        result.push(DiskInfo {
-            name: dev_name,
-            filesystem: fstype,
-            used_gb: (used * 10.0).round() / 10.0,
-            total_gb: (total * 10.0).round() / 10.0,
-            usage_pct: (pct * 10.0).round() / 10.0,
-        });
-    }
-
     result
 }
 
@@ -593,11 +523,7 @@ fn gpu_from_sysfs() -> Option<String> {
 }
 
 pub fn hostusr() -> String {
-    format!(
-        "{} ( {} )",
-        whoami::username(),
-        whoami::fallible::hostname().unwrap_or_default()
-    )
+    format!("{} ( {} )", identity::username(), identity::hostname())
 }
 
 pub fn uptime() -> String {
@@ -675,24 +601,9 @@ pub fn get_battery_charge() -> usize {
         return pct;
     }
 
-    // sysfs exists on linux, so an empty scan means this machine genuinely has
-    // no battery. bail instead of paying ~0.9ms for a manager walk.
-    if Path::new("/sys/class/power_supply").exists() {
-        return 500;
-    }
-
-    let manager = match Manager::new() {
-        Ok(m) => m,
-        Err(_) => return 500,
-    };
-
-    if let Ok(mut battery_list) = manager.batteries() {
-        if let Some(Ok(battery)) = battery_list.next() {
-            let raw_percent: f32 = battery.state_of_charge().get::<percent>();
-            return raw_percent as usize;
-        }
-    }
-
+    // sysfs is the only source rfetch reads, so an empty scan means no battery
+    // (or a manager that hides it). report the "no battery" sentinel instead of
+    // spawning a dbus probe.
     500
 }
 
@@ -950,8 +861,7 @@ pub fn load_avg() -> String {
             return format!("{}, {}, {}", one, five, fifteen);
         }
     }
-    let avg = System::load_average();
-    format!("{:.2}, {:.2}, {:.2}", avg.one, avg.five, avg.fifteen)
+    "unknown".to_string()
 }
 
 pub fn process_count() -> Option<usize> {
@@ -1060,23 +970,6 @@ pub fn boot_time() -> String {
     if let Some(ts) = read_btime() {
         if let Some(s) = format_local(ts) {
             return s;
-        }
-    }
-    // fallback: sysinfo boot timestamp formatted via `date` (local tz)
-    let ts = System::boot_time();
-    if ts > 0 {
-        if let Ok(out) = Command::new("date")
-            .arg("-d")
-            .arg(format!("@{}", ts))
-            .arg("+%F %T")
-            .output()
-        {
-            if out.status.success() {
-                let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                if !s.is_empty() {
-                    return s;
-                }
-            }
         }
     }
     "unknown".to_string()
