@@ -22,11 +22,29 @@ pub fn is_termux() -> bool {
 }
 
 /// value of `key` in an os-release style `KEY=VALUE` file, quotes stripped.
+///
+/// values may be unquoted (`ID=arch`), double-quoted (`ID="arch"`) or
+/// single-quoted (`ID='gentoo'`, as Gentoo ships it), per the os-release spec.
 fn extract_value(content: &str, key: &str) -> Option<String> {
-    for line in content.lines() {
-        if let Some(rest) = line.strip_prefix(&format!("{}=", key)) {
+    let prefix = format!("{}=", key);
+    for raw_line in content.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix(&prefix) {
             let v = rest.trim();
-            return Some(v.trim_start_matches('"').trim_end_matches('"').to_string());
+            if v.len() >= 2 {
+                let b = v.as_bytes();
+                if (b[0] == b'"' && b[b.len() - 1] == b'"')
+                    || (b[0] == b'\'' && b[b.len() - 1] == b'\'')
+                {
+                    return Some(v[1..v.len() - 1].to_string());
+                }
+            }
+            // unquoted or unbalanced: strip any stray surrounding quotes
+            // (preserves the old double-quote-stripping behavior).
+            return Some(v.trim_matches(|c| c == '"' || c == '\'').to_string());
         }
     }
     None
@@ -1036,6 +1054,23 @@ mod tests {
         );
         assert_eq!(extract_value(content, "ID_LIKE").as_deref(), Some("arch"));
         assert_eq!(extract_value(content, "NAME"), None);
+    }
+
+    #[test]
+    fn extract_value_strips_single_quotes_gentoo_style() {
+        // Gentoo ships ID='gentoo' with single quotes; both must resolve bare.
+        let content = "NAME='Gentoo'\nID='gentoo'\nPRETTY_NAME='Gentoo Linux'\n";
+        assert_eq!(extract_value(content, "ID").as_deref(), Some("gentoo"));
+        assert_eq!(extract_value(content, "NAME").as_deref(), Some("Gentoo"));
+        assert_eq!(
+            extract_value(content, "PRETTY_NAME").as_deref(),
+            Some("Gentoo Linux")
+        );
+        // unquoted still works
+        assert_eq!(
+            extract_value("ID=arch\n", "ID").as_deref(),
+            Some("arch")
+        );
     }
 
     #[test]
